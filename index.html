@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MetaFairy – Datensatzbeschreibungen lokal mit KI</title>
+<style>
+  :root{
+    --paper:#fafaf7; --ink:#1a1a1a; --line:#d9d6cc;
+    --red:#d1001f; --red-dark:#a3001a; --muted:#6b6b63; --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+    line-height:1.5}
+  header{border-bottom:3px solid var(--ink);padding:28px 24px 20px;
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px}
+  h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-0.01em}
+  h1 span{color:var(--red)}
+  .sub{color:var(--muted);font-size:0.92rem;max-width:520px}
+  main{max-width:920px;margin:0 auto;padding:24px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:2px;padding:20px;margin-bottom:20px}
+  .modelrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  select,button,textarea,input{font-family:inherit;font-size:0.95rem}
+  select{padding:8px 10px;border:1px solid var(--ink);background:#fff;border-radius:2px}
+  button{padding:9px 18px;border:2px solid var(--ink);background:var(--ink);color:#fff;
+    border-radius:2px;cursor:pointer;font-weight:600}
+  button.secondary{background:#fff;color:var(--ink)}
+  button:disabled{opacity:0.4;cursor:not-allowed}
+  button:hover:not(:disabled){background:var(--red);border-color:var(--red)}
+  button.secondary:hover:not(:disabled){background:var(--paper);color:var(--ink);border-color:var(--ink)}
+  .progresswrap{height:8px;background:var(--paper);border:1px solid var(--line);border-radius:4px;
+    overflow:hidden;margin-top:10px;display:none}
+  .progressbar{height:100%;width:0%;background:var(--red);transition:width .2s}
+  .status{font-size:0.85rem;color:var(--muted);margin-top:8px}
+  .tabs{display:flex;gap:0;border-bottom:2px solid var(--ink);margin-bottom:0}
+  .tab{padding:10px 18px;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:3px solid transparent}
+  .tab.active{color:var(--ink);border-bottom-color:var(--red)}
+  .tabpanel{display:none;padding-top:18px}
+  .tabpanel.active{display:block}
+  label{display:block;font-weight:700;font-size:0.85rem;margin:14px 0 6px}
+  label:first-child{margin-top:0}
+  textarea,input[type=text]{width:100%;padding:10px;border:1px solid var(--line);
+    border-radius:2px;background:var(--paper)}
+  textarea{min-height:110px;resize:vertical}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:600px){.grid2{grid-template-columns:1fr}}
+  .actions{margin-top:16px;display:flex;gap:10px}
+  .result{margin-top:22px}
+  .cat{border-left:4px solid var(--red);padding:4px 0 4px 14px;margin-bottom:16px}
+  .cat h3{margin:0 0 4px;font-size:1rem}
+  .cat p, .cat li{margin:2px 0;font-size:0.94rem}
+  .placeholder{color:var(--muted);font-style:italic;font-size:0.9rem}
+  footer{max-width:920px;margin:0 auto;padding:10px 24px 40px;color:var(--muted);font-size:0.8rem}
+  a{color:var(--red-dark)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Meta<span>Fairy</span></h1>
+    <div class="sub">Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die KI läuft komplett lokal im Browser, keine Daten verlassen dein Gerät.</div>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="modelrow">
+      <label style="margin:0">Modell:</label>
+      <select id="model" disabled><option>lade Modellliste…</option></select>
+      <button id="loadBtn">Modell laden</button>
+    </div>
+    <div class="progresswrap" id="progresswrap"><div class="progressbar" id="progressbar"></div></div>
+    <div class="status" id="status">Modell muss beim ersten Mal heruntergeladen werden (mehrere hundert MB bis wenige GB). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).</div>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab active" data-tab="analyze">Beschreibung analysieren</div>
+      <div class="tab" data-tab="generate">Beschreibung generieren</div>
+    </div>
+
+    <div class="tabpanel active" id="tab-analyze">
+      <label for="existing">Bestehende Beschreibung</label>
+      <textarea id="existing" placeholder="Beschreibung des Datensatzes hier einfügen…"></textarea>
+      <div class="actions">
+        <button id="analyzeBtn" disabled>Beschreibung analysieren</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-generate">
+      <label for="title">Titel des Datensatzes</label>
+      <input type="text" id="title" placeholder="z. B. Fahrgastzahlen ÖV Kanton Zürich">
+      <div class="grid2">
+        <div>
+          <label for="keywords">Stichworte / Inhalt</label>
+          <textarea id="keywords" placeholder="Was ist in den Daten enthalten?"></textarea>
+        </div>
+        <div>
+          <label for="context">Entstehung / Quelle</label>
+          <textarea id="context" placeholder="Wie und wozu wurden die Daten erhoben? Quelle?"></textarea>
+        </div>
+        <div>
+          <label for="quality">Datenqualität</label>
+          <textarea id="quality" placeholder="Vollständigkeit, bekannte Lücken, Änderungen in der Erhebung…"></textarea>
+        </div>
+        <div>
+          <label for="spatial">Räumlicher Bezug</label>
+          <textarea id="spatial" placeholder="Erhebungsraum, Aggregationsstufe (Gemeinde, Kanton…)"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="generateBtn" disabled>Beschreibung generieren</button>
+      </div>
+    </div>
+
+    <div class="result" id="result"></div>
+  </div>
+</main>
+
+<footer>
+  Läuft vollständig client-seitig über <a href="https://github.com/mlc-ai/web-llm" target="_blank">WebLLM</a>. Keine API-Keys, keine Server-Kosten. Nach dem Vorbild von
+  <a href="https://github.com/machinelearningZH/ogd_ai-metafairy" target="_blank">machinelearningZH/ogd_ai-metafairy</a> (MIT-Lizenz).
+</footer>
+
+<script type="module">
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const modelSelect = document.getElementById('model');
+const loadBtn = document.getElementById('loadBtn');
+const status = document.getElementById('status');
+const progresswrap = document.getElementById('progresswrap');
+const progressbar = document.getElementById('progressbar');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const generateBtn = document.getElementById('generateBtn');
+const resultEl = document.getElementById('result');
+
+let engine = null;
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+  });
+});
+
+if(!navigator.gpu){
+  status.textContent = 'Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
+  loadBtn.disabled = true;
+} else {
+  const models = webllm.prebuiltAppConfig.model_list
+    .filter(m => /Instruct/i.test(m.model_id) && !/vision|VLM/i.test(m.model_id))
+    .sort((a,b) => (a.vram_required_MB||9e9) - (b.vram_required_MB||9e9));
+  modelSelect.innerHTML = '';
+  models.forEach(m=>{
+    const opt = document.createElement('option');
+    opt.value = m.model_id;
+    const gb = m.vram_required_MB ? (m.vram_required_MB/1024).toFixed(1)+' GB' : '?';
+    opt.textContent = `${m.model_id} (${gb})`;
+    modelSelect.appendChild(opt);
+  });
+  modelSelect.disabled = false;
+  // Kleines, ausgewogenes Modell vorauswählen
+  const pref = models.find(m => /3\.2-3B|Phi-3\.5-mini|Qwen2\.5-3B/i.test(m.model_id));
+  if(pref) modelSelect.value = pref.model_id;
+}
+
+loadBtn.addEventListener('click', async ()=>{
+  loadBtn.disabled = true;
+  modelSelect.disabled = true;
+  progresswrap.style.display = 'block';
+  try{
+    engine = new webllm.MLCEngine();
+    engine.setInitProgressCallback((p)=>{
+      progressbar.style.width = Math.round((p.progress||0)*100)+'%';
+      status.textContent = p.text || 'Lädt…';
+    });
+    await engine.reload(modelSelect.value);
+    status.textContent = 'Modell geladen. Bereit.';
+    analyzeBtn.disabled = false;
+    generateBtn.disabled = false;
+  }catch(err){
+    status.textContent = 'Fehler beim Laden: ' + err.message;
+    modelSelect.disabled = false;
+  }
+  loadBtn.disabled = false;
+});
+
+const CATS = [
+  ['Dateninhalt', 'Was die Daten enthalten und was sich damit sagen lässt.'],
+  ['Entstehungszusammenhang', 'Erhebungsmethode, Zweck, Quelle.'],
+  ['Datenqualität', 'Vollständigkeit, Einschränkungen, Änderungen in der Erhebung.'],
+  ['Räumlicher Bezug', 'Erhebungsraum und Aggregationsstufe.']
+];
+
+const SYSTEM = `Du bist eine Fachperson für offene Verwaltungsdaten (Open Government Data) in der Schweiz und hilfst, Datensatzbeschreibungen nach DCAT-AP-CH zu prüfen bzw. zu entwerfen. Strukturiere jede Antwort immer entlang exakt dieser vier Abschnitte, mit genau diesen Überschriften als Markdown-H3 (### ):
+### Dateninhalt
+### Entstehungszusammenhang
+### Datenqualität
+### Räumlicher Bezug
+Schreibe prägnant, sachlich, auf Deutsch. Bei einer Analyse: bewerte jeden Abschnitt kurz und nenne fehlende oder unklare Angaben. Bei einer Generierung: schreibe für jeden Abschnitt einen fertigen Beschreibungstext basierend auf den gegebenen Stichworten; wenn zu einem Abschnitt keine Angaben vorliegen, schreibe "Keine Angaben – bitte ergänzen." statt zu erfinden.`;
+
+function renderMarkdownish(text){
+  // sehr einfache Umwandlung: ### Überschrift -> Karte, **bold**, - Listen
+  const blocks = text.split(/(?=^###\s)/m).filter(b=>b.trim());
+  if(blocks.length === 0) return `<p>${escapeHtml(text)}</p>`;
+  return blocks.map(b=>{
+    const lines = b.trim().split('\n');
+    const heading = lines[0].replace(/^###\s*/, '');
+    const body = lines.slice(1).join('\n').trim();
+    const html = body.split('\n').map(line=>{
+      line = line.trim();
+      if(!line) return '';
+      line = escapeHtml(line).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+      if(/^[-*]\s+/.test(line)) return `<li>${line.replace(/^[-*]\s+/,'')}</li>`;
+      return `<p>${line}</p>`;
+    }).join('\n');
+    return `<div class="cat"><h3>${escapeHtml(heading)}</h3>${html || '<p class="placeholder">–</p>'}</div>`;
+  }).join('');
+}
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function run(userPrompt, btn){
+  btn.disabled = true;
+  resultEl.innerHTML = '<p class="placeholder">Erzeuge Antwort…</p>';
+  try{
+    const reply = await engine.chat.completions.create({
+      messages: [
+        {role:'system', content: SYSTEM},
+        {role:'user', content: userPrompt}
+      ],
+      temperature: 0.4
+    });
+    const text = reply.choices[0].message.content;
+    resultEl.innerHTML = renderMarkdownish(text);
+  }catch(err){
+    resultEl.innerHTML = `<p class="placeholder">Fehler: ${escapeHtml(err.message)}</p>`;
+  }
+  btn.disabled = false;
+}
+
+analyzeBtn.addEventListener('click', ()=>{
+  const existing = document.getElementById('existing').value.trim();
+  if(!existing) return;
+  run(`Analysiere folgende bestehende Datensatzbeschreibung entlang der vier Abschnitte:\n\n${existing}`, analyzeBtn);
+});
+
+generateBtn.addEventListener('click', ()=>{
+  const title = document.getElementById('title').value.trim();
+  const keywords = document.getElementById('keywords').value.trim();
+  const context = document.getElementById('context').value.trim();
+  const quality = document.getElementById('quality').value.trim();
+  const spatial = document.getElementById('spatial').value.trim();
+  const prompt = `Erstelle eine Datensatzbeschreibung für folgenden Datensatz:\nTitel: ${title||'(kein Titel angegeben)'}\nStichworte/Inhalt: ${keywords||'-'}\nEntstehung/Quelle: ${context||'-'}\nDatenqualität: ${quality||'-'}\nRäumlicher Bezug: ${spatial||'-'}`;
+  run(prompt, generateBtn);
+});
+</script>
+</body>
+</html>
