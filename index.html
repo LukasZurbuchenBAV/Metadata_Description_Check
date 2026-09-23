@@ -175,11 +175,13 @@ loadBtn.addEventListener('click', async ()=>{
   generateBtn.disabled = true;
   progresswrap.style.display = 'block';
   try{
-    engine = new webllm.MLCEngine();
-    engine.setInitProgressCallback((p)=>{
-      progressbar.style.width = Math.round((p.progress||0)*100)+'%';
-      status.textContent = p.text || 'Lädt…';
-    });
+    if(!engine){
+      engine = new webllm.MLCEngine();
+      engine.setInitProgressCallback((p)=>{
+        progressbar.style.width = Math.round((p.progress||0)*100)+'%';
+        status.textContent = p.text || 'Lädt…';
+      });
+    }
     await engine.reload(modelSelect.value);
     status.textContent = 'Modell geladen. Bereit.';
     analyzeBtn.disabled = false;
