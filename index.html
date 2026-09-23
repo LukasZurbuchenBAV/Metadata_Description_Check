@@ -171,6 +171,8 @@ if(!navigator.gpu){
 loadBtn.addEventListener('click', async ()=>{
   loadBtn.disabled = true;
   modelSelect.disabled = true;
+  analyzeBtn.disabled = true;
+  generateBtn.disabled = true;
   progresswrap.style.display = 'block';
   try{
     engine = new webllm.MLCEngine();
@@ -226,6 +228,10 @@ function escapeHtml(s){
 }
 
 async function run(userPrompt, btn){
+  if(!engine){
+    resultEl.innerHTML = '<p class="placeholder">Bitte zuerst ein Modell laden.</p>';
+    return;
+  }
   btn.disabled = true;
   resultEl.innerHTML = '<p class="placeholder">Erzeuge Antwort…</p>';
   try{
