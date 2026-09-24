@@ -200,12 +200,22 @@ const CATS = [
   ['Räumlicher Bezug', 'Erhebungsraum und Aggregationsstufe.']
 ];
 
-const SYSTEM = `Du bist eine Fachperson für offene Verwaltungsdaten (Open Government Data) in der Schweiz und hilfst, Datensatzbeschreibungen nach DCAT-AP-CH zu prüfen bzw. zu entwerfen. Strukturiere jede Antwort immer entlang exakt dieser vier Abschnitte, mit genau diesen Überschriften als Markdown-H3 (### ):
+const ANALYZE_SYSTEM = `Du bist eine Fachperson für offene Verwaltungsdaten (Open Government Data) in der Schweiz und beurteilst Datensatzbeschreibungen nach DCAT-AP-CH.
+Du bekommst einen frei formulierten Beschreibungstext. Deine Aufgabe: Lies den GESAMTEN Text sorgfältig und ordne alle relevanten Aussagen inhaltlich den folgenden vier Abschnitten zu – auch wenn die Begriffe im Text nicht wörtlich vorkommen (z. B. gehört eine genannte Rechtsgrundlage oder wer die Daten liefert zum Entstehungszusammenhang; eine genannte Aktualität/Periodizität zur Datenqualität).
+Gib für jeden Abschnitt als Markdown-H3 (### ) 1-3 Sätze wieder, was der Text dazu aussagt, und benenne kurz Lücken oder Unklarheiten. Schreibe "Keine Angaben im Text gefunden." nur, wenn zu diesem Abschnitt wirklich nichts im Text steht. Erfinde nichts, was nicht im Text steht.
 ### Dateninhalt
 ### Entstehungszusammenhang
 ### Datenqualität
 ### Räumlicher Bezug
-Schreibe prägnant, sachlich, auf Deutsch. Bei einer Analyse: bewerte jeden Abschnitt kurz und nenne fehlende oder unklare Angaben. Bei einer Generierung: schreibe für jeden Abschnitt einen fertigen Beschreibungstext basierend auf den gegebenen Stichworten; wenn zu einem Abschnitt keine Angaben vorliegen, schreibe "Keine Angaben – bitte ergänzen." statt zu erfinden.`;
+Antworte auf Deutsch, ausschliesslich in diesem Format.`;
+
+const GENERATE_SYSTEM = `Du bist eine Fachperson für offene Verwaltungsdaten (Open Government Data) in der Schweiz und entwirfst Datensatzbeschreibungen nach DCAT-AP-CH.
+Du bekommst Stichworte zu einem Datensatz, teils den vier Abschnitten schon zugeordnet. Schreibe für jeden Abschnitt einen fertigen, zusammenhängenden Beschreibungstext (2-4 Sätze) als Markdown-H3 (### ). Nutze dafür alle passenden Angaben aus allen Feldern, auch wenn sie ursprünglich unter einem anderen Feld standen. Wenn zu einem Abschnitt wirklich keine Angaben vorliegen, schreibe "Keine Angaben – bitte ergänzen." statt zu erfinden.
+### Dateninhalt
+### Entstehungszusammenhang
+### Datenqualität
+### Räumlicher Bezug
+Antworte auf Deutsch, ausschliesslich in diesem Format.`;
 
 function renderMarkdownish(text){
   // sehr einfache Umwandlung: ### Überschrift -> Karte, **bold**, - Listen
@@ -229,7 +239,7 @@ function escapeHtml(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function run(userPrompt, btn){
+async function run(userPrompt, systemPrompt, btn){
   if(!engine){
     resultEl.innerHTML = '<p class="placeholder">Bitte zuerst ein Modell laden.</p>';
     return;
@@ -239,7 +249,7 @@ async function run(userPrompt, btn){
   try{
     const reply = await engine.chat.completions.create({
       messages: [
-        {role:'system', content: SYSTEM},
+        {role:'system', content: systemPrompt},
         {role:'user', content: userPrompt}
       ],
       temperature: 0.4
@@ -255,7 +265,7 @@ async function run(userPrompt, btn){
 analyzeBtn.addEventListener('click', ()=>{
   const existing = document.getElementById('existing').value.trim();
   if(!existing) return;
-  run(`Analysiere folgende bestehende Datensatzbeschreibung entlang der vier Abschnitte:\n\n${existing}`, analyzeBtn);
+  run(`Analysiere folgende bestehende Datensatzbeschreibung entlang der vier Abschnitte:\n\n${existing}`, ANALYZE_SYSTEM, analyzeBtn);
 });
 
 generateBtn.addEventListener('click', ()=>{
@@ -265,7 +275,7 @@ generateBtn.addEventListener('click', ()=>{
   const quality = document.getElementById('quality').value.trim();
   const spatial = document.getElementById('spatial').value.trim();
   const prompt = `Erstelle eine Datensatzbeschreibung für folgenden Datensatz:\nTitel: ${title||'(kein Titel angegeben)'}\nStichworte/Inhalt: ${keywords||'-'}\nEntstehung/Quelle: ${context||'-'}\nDatenqualität: ${quality||'-'}\nRäumlicher Bezug: ${spatial||'-'}`;
-  run(prompt, generateBtn);
+  run(prompt, GENERATE_SYSTEM, generateBtn);
 });
 </script>
 </body>
