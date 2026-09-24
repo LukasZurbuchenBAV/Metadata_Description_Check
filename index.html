@@ -112,8 +112,8 @@
           <textarea id="source" placeholder="Wie und von wem werden die Daten erhoben/geliefert? Rechtsgrundlage?"></textarea>
         </div>
         <div>
-          <label for="completeness">Vollständigkeit</label>
-          <textarea id="completeness" placeholder="Aktualität, bekannte Lücken, Abdeckung"></textarea>
+          <label for="completeness">Vollständigkeit und Aktualität</label>
+          <textarea id="completeness" placeholder="Aktualität, bekannte Lücken, Änderungen in der Erhebungsmethode"></textarea>
         </div>
         <div>
           <label for="interpretation">Interpretation</label>
@@ -218,20 +218,28 @@ const CATS = [
 
 const ANALYZE_SYSTEM = `Du bist ein hilfreicher Assistent für ein Bundesamt. Du wirst gebeten, Metadaten für einen Datensatz zu analysieren. Bleibe stets wahrheitsgemäss und objektiv. Schreibe nur, was du anhand der vom Benutzer bereitgestellten Metadaten sicher feststellen kannst. Mache keine Annahmen. Schreibe einfach und klar. Schreibe immer in deutscher Sprache.
 
-Du erhältst Titel und Beschreibung eines Datensatzes. Analysiere Schritt für Schritt nach folgenden sechs Kriterien, wie detailliert und eindeutig Titel und Beschreibung dazu Auskunft geben:
+Du erhältst Titel und Beschreibung eines Datensatzes. Es gelten folgende offizielle Erfassungshinweise:
 
-1. Zweck - Wird klar, wofür die Daten dienen bzw. wozu sie verwendet werden?
-2. Inhalt - Wird klar, was in den Daten enthalten ist (Variablen, Umfang)?
-3. Erhebung / Quelle - Wird klar, wie die Daten erhoben wurden, auf welcher Rechtsgrundlage und wer sie liefert?
-4. Vollständigkeit - Wird klar, wie vollständig die Daten sind, ob es Änderungen in der Erhebung gab?
-5. Interpretation - Wird klar, welche Rückschlüsse sich aus den Daten ziehen lassen und welche NICHT?
-6. Räumlicher Bezug - Wird klar, auf welches Gebiet bzw. welche Aggregationsstufe sich die Daten beziehen?
+Titel: "Gib einen kurzen, klar verständlichen Titel des Datenbestands an. Der Titel soll den Inhalt in wenigen Worten beschreiben und auch für Laien nachvollziehbar sein. Vermeide Abkürzungen, Gesetzesartikel, Dateinamen oder Unterstriche."
+
+Beschreibung: "Beschreibe den Inhalt und Zweck des Datenbestands so, dass klar wird, worum es in den Daten geht und wofür sie verwendet werden können. Erläutere, welche Informationen enthalten sind, wie und wofür die Daten erhoben oder erzeugt wurden, und aus welcher Quelle sie stammen. Gib an, wie vollständig und aktuell die Daten sind und ob es Änderungen in der Erhebungsmethode gab. Beschreibe ausserdem, welche Rückschlüsse aus den Daten möglich sind und welche nicht. Falls relevant, ergänze den räumlichen Bezug."
+
+Analysiere Schritt für Schritt nach folgenden sieben Kriterien, wie gut Titel und Beschreibung diese Hinweise erfüllen:
+
+1. Titel - Ist der Titel kurz, klar, für Laien verständlich? Enthält er Abkürzungen, Gesetzesartikel, Dateinamen oder Unterstriche (= schlecht)?
+2. Zweck - Wird klar, wofür die Daten dienen bzw. wozu sie verwendet werden?
+3. Inhalt - Wird klar, was in den Daten enthalten ist (Variablen, Umfang)?
+4. Erhebung / Quelle - Wird klar, wie die Daten erhoben wurden, auf welcher Rechtsgrundlage und wer sie liefert?
+5. Vollständigkeit - Wird klar, wie vollständig und aktuell die Daten sind, ob es Änderungen in der Erhebung gab?
+6. Interpretation - Wird klar, welche Rückschlüsse sich aus den Daten ziehen lassen und welche NICHT?
+7. Räumlicher Bezug - Wird klar, auf welches Gebiet bzw. welche Aggregationsstufe sich die Daten beziehen (falls relevant)?
 
 Hier ein Beispiel:
 
 Titel: Web Analytics der Open Government Data des Kantons Zürich auf opendata.swiss von Februar 2018 bis Februar 2021
 Beschreibung: Monatliche Nutzungsstatistiken (Anzahl Besuche) der Open Government Data (OGD) Metadatensätze von Verwaltungseinheiten und Organen des Kantons Zürich, die auf dem zentralen Katalog für offene Behördendaten opendata.swiss findbar sind. Hinweise: Ab Januar 2019 sind die Web Analytics um weitere Metadateninformationen erweitert bzw. wurden Metadatenanpassungen vorgenommen. Ab März 2021 sind die monatlichen Aktualisierungen aufgrund technischer Herausforderungen pausiert. Variablendefinitionen: Column 'name' = dataset slug; 'issued' = first publication of dataset; 'organization_name' = publisher slug; 'organization_url' = publisher URL.
 
+Titel: Klar und verständlich, aber recht lang und mit Datumsangabe statt reinem Inhalt. -> 3 Punkte
 Zweck: Nicht explizit erklärt, wofür die Nutzungsstatistiken verwendet werden. -> 2 Punkte
 Inhalt: Detaillierte und eindeutige Erklärung der enthaltenen Variablen. -> 5 Punkte
 Erhebung / Quelle: Klar, dass es Web-Analytics-Daten von opendata.swiss sind, Erhebungstool aber nicht genannt. -> 3 Punkte
@@ -244,6 +252,7 @@ Hier ein weiteres Beispiel:
 Titel: Kühe [Anz.]
 Beschreibung: Anzahl Kühe
 
+Titel: Enthält eine Abkürzung ("Anz.") und eckige Klammern, ist nicht selbsterklärend. -> 2 Punkte
 Zweck: Keine Angabe. -> 1 Punkt
 Inhalt: Nicht klar, welche Daten genau erfasst werden. -> 2 Punkte
 Erhebung / Quelle: Keine Angabe. -> 1 Punkt
@@ -253,6 +262,7 @@ Räumlicher Bezug: Keine Angabe. -> 1 Punkt
 
 Gib das Ergebnis deiner Analyse in XML-Tags aus, in dieser Form:
 
+<titel>...</titel>
 <zweck>...</zweck>
 <inhalt>...</inhalt>
 <erhebung>...</erhebung>
@@ -260,9 +270,9 @@ Gib das Ergebnis deiner Analyse in XML-Tags aus, in dieser Form:
 <interpretation>...</interpretation>
 <raeumlicherbezug>...</raeumlicherbezug>
 
-Vergib dann eine Bewertung für jedes der sechs Kriterien auf der Skala 1-5, wobei 1 die schlechteste und 5 die beste Bewertung ist. Sei klar, hart und kritisch bei deiner Bewertung.
+Vergib dann eine Bewertung für jedes der sieben Kriterien auf der Skala 1-5, wobei 1 die schlechteste und 5 die beste Bewertung ist. Sei klar, hart und kritisch bei deiner Bewertung.
 
-1 Punkt - Keine Informationen zu diesem Kriterium.
+1 Punkt - Keine Informationen zu diesem Kriterium / Hinweise werden nicht befolgt.
 2 Punkte - Wenige Informationen, viel fehlt.
 3 Punkte - Mittelmässige Informationen, einiges vorhanden, einiges fehlt.
 4 Punkte - Gute Informationen, die meisten Informationen sind vorhanden.
@@ -270,6 +280,7 @@ Vergib dann eine Bewertung für jedes der sechs Kriterien auf der Skala 1-5, wob
 
 Gib die Bewertung in XML-Tags aus, in dieser Form:
 
+<titel-score>...</titel-score>
 <zweck-score>...</zweck-score>
 <inhalt-score>...</inhalt-score>
 <erhebung-score>...</erhebung-score>
@@ -283,11 +294,11 @@ Schreibe aus den gegebenen Stichworten eine verständliche, prägnante und suchm
 
 Behandle inhaltlich in dieser Reihenfolge, soweit Angaben vorhanden sind:
 1. Zweck - Wofür dienen die Daten, wozu werden sie verwendet?
-2. Inhalt - Was finde ich in diesen Daten?
-3. Erhebung / Quelle - Wie und von wem wurden die Daten erhoben, welche Rechtsgrundlage gibt es?
-4. Vollständigkeit - Sind die Daten vollständig? Gibt es Änderungen in der Erhebung?
-5. Interpretation - Welche Rückschlüsse lassen sich NICHT aus den Daten ziehen?
-6. Räumlicher Bezug - Wie sind die Daten räumlich aggregiert? Auf welches Gebiet beziehen sie sich?
+2. Inhalt - Welche Informationen sind enthalten?
+3. Erhebung / Quelle - Wie und wofür wurden die Daten erhoben oder erzeugt, aus welcher Quelle stammen sie?
+4. Vollständigkeit und Aktualität - Wie vollständig und aktuell sind die Daten, gab es Änderungen in der Erhebungsmethode?
+5. Interpretation - Welche Rückschlüsse sind aus den Daten möglich und welche nicht?
+6. Räumlicher Bezug (falls relevant) - In welchem Gebiet oder auf welcher Aggregationsstufe (z. B. Gemeinde, Kanton, Schweiz) liegen die Daten vor?
 
 Formuliere alles aus. Wenn zu einem der Punkte keine Angaben vorliegen, lasse diesen Punkt einfach weg statt eine Lücke zu erwähnen.
 Löse gendergerechte Sprache auf und nenne jeweils beide Geschlechter, also z. B. «Besucherinnen und Besucher», «Bürgerinnen und Bürger», «Verkehrsteilnehmerinnen und Verkehrsteilnehmer».
@@ -333,6 +344,7 @@ function extractTag(text, tag){
 }
 function renderAnalysisXML(text){
   const axes = [
+    ['titel','Titel'],
     ['zweck','Zweck'], ['inhalt','Inhalt'], ['erhebung','Erhebung / Quelle'],
     ['vollstaendigkeit','Vollständigkeit'], ['interpretation','Interpretation'],
     ['raeumlicherbezug','Räumlicher Bezug']
