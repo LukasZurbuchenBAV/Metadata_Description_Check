@@ -235,7 +235,7 @@ Bewerte nach diesen sieben Kriterien:
 
 Zu JEDEM Kriterium gibst du drei Dinge an:
 - Einschätzung: 1-2 Sätze, was der Text dazu enthält (oder "Keine Angabe.").
-- Tipp: ein konkreter Verbesserungsvorschlag, was fehlt oder geändert bzw. ergänzt werden sollte. Der Tipp ist IMMER Pflicht, auch bei guten Bewertungen (dann: was sich noch verfeinern liesse), und wiederholt nicht die Einschätzung.
+- Tipp: ein konkreter Verbesserungsvorschlag, was fehlt oder geändert bzw. ergänzt werden sollte. Der Tipp ist IMMER Pflicht, nennt eine konkrete Ergänzung oder Änderung (auch bei guten Bewertungen, dann eine mögliche Verfeinerung) und wiederholt nicht die Einschätzung. Formulierungen wie «Keine Änderungen erforderlich» sind verboten. Schreibe nie «Keine Änderungen erforderlich» oder Ähnliches, sondern nenne immer etwas Konkretes.
 - Score von 1 bis 5. Sei klar, hart und kritisch.
 1 = keine Informationen, 2 = wenige Informationen, viel fehlt, 3 = mittelmässig, einiges fehlt, 4 = gut, das meiste ist vorhanden, 5 = exzellent, klar, vollständig und detailliert.
 
@@ -311,6 +311,16 @@ function extractTag(text, tag){
   const m = text.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'));
   return m ? m[1].trim() : '';
 }
+const DEFAULT_TIPS = {
+  titel: 'Titel kurz, klar und für Laien verständlich formulieren; Abkürzungen, Gesetzesartikel, Dateinamen und Unterstriche vermeiden.',
+  zweck: 'Beschreiben, wofür die Daten dienen bzw. verwendet werden können.',
+  inhalt: 'Erläutern, welche Informationen (Variablen, Umfang) in den Daten enthalten sind.',
+  erhebung: 'Angeben, wie und wofür die Daten erhoben oder erzeugt wurden und aus welcher Quelle sie stammen.',
+  vollstaendigkeit: 'Angeben, wie vollständig und aktuell die Daten sind und ob es Änderungen in der Erhebungsmethode gab.',
+  interpretation: 'Beschreiben, welche Rückschlüsse aus den Daten möglich sind und welche nicht.',
+  raeumlicherbezug: 'Falls relevant: Gebiet oder Aggregationsstufe (z. B. Gemeinde, Kanton, Schweiz) nennen.'
+};
+const FILLER = /(keine|nicht)\s+(\w+\s+){0,2}(erforderlich|nötig|notwendig)|keine\s+(änderung|verbesserung|ergänzung|anpassung)/i;
 function renderAnalysisXML(text){
   const axes = [
     ['titel','Titel'], ['zweck','Zweck'], ['inhalt','Inhalt'], ['erhebung','Erhebung / Quelle'],
@@ -324,7 +334,10 @@ function renderAnalysisXML(text){
     const found = extractTag(text, tag+'-score').match(/[1-5]/);
     const sc = /^\s*keine angabe/i.test(body) ? '1' : (found ? found[0] : null);
     const badge = sc ? `<span class="score score-${sc}">${sc}/5</span>` : '';
-    const tipHtml = tip ? `<p style="font-style:italic;color:var(--muted)"><strong style="font-style:normal">Verbesserung:</strong> ${escapeHtml(tip)}</p>` : '';
+    const filler = !tip || FILLER.test(tip);
+    const tipText = !filler ? tip : (sc && +sc <= 3 ? DEFAULT_TIPS[tag] : '');
+    const tipLabel = !filler ? 'Verbesserung:' : 'Verbesserung (Standardhinweis):';
+    const tipHtml = tipText ? `<p style="font-style:italic;color:var(--muted)"><strong style="font-style:normal">${tipLabel}</strong> ${escapeHtml(tipText)}</p>` : '';
     return `<div class="cat"><h3>${label} ${badge}</h3><p>${escapeHtml(body)}</p>${tipHtml}</div>`;
   }).join('');
 }
@@ -376,6 +389,7 @@ async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}
   btn.disabled = false;
 }
 
+const FILLER_TIP = /^\s*(keine?|nichts)\b.{0,40}?(änder|verbesser|anpass|ergänz|optimier|erforderlich|nötig|notwendig)/i;
 const ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];
 function analysisIsBad(t){
   const bodies = ANALYSIS_TAGS.filter(k=>extractTag(t,k)).length;
@@ -384,7 +398,11 @@ function analysisIsBad(t){
     const sc = +((extractTag(t,k+'-score').match(/[1-5]/)||[0])[0]);
     return /^\s*keine angabe/i.test(extractTag(t,k)) && sc > 2;
   }).length;
-  return bodies < 6 || tips < 5 || contradictions > 0;
+  const fillers = ANALYSIS_TAGS.filter(k=>{
+    const sc = +((extractTag(t,k+'-score').match(/[1-5]/)||[0])[0]);
+    return sc >= 1 && sc <= 4 && FILLER_TIP.test(extractTag(t,k+'-tipp'));
+  }).length;
+  return bodies < 6 || tips < 5 || contradictions > 0 || fillers > 0;
 }
 
 analyzeBtn.addEventListener('click', ()=>{
@@ -392,7 +410,7 @@ analyzeBtn.addEventListener('click', ()=>{
   const existing = document.getElementById('existing').value.trim();
   if(!existing) return;
   const prompt = `Titel: ${title||'(kein Titel angegeben)'}\nBeschreibung: ${existing}`;
-  const retryPrompt = prompt + '\n\nWICHTIG: Antworte im gleichen XML-Format wie in der Beispielantwort. Schreibe zu JEDEM der sieben Kriterien eine inhaltliche Einschätzung, einen konkreten Verbesserungsvorschlag (Tag mit Zusatz -tipp) und einen Score. Lasse kein Tag leer.';
+  const retryPrompt = prompt + '\n\nWICHTIG: Antworte im gleichen XML-Format wie in der Beispielantwort. Schreibe zu JEDEM der sieben Kriterien eine inhaltliche Einschätzung, einen konkreten Verbesserungsvorschlag (Tag mit Zusatz -tipp) und einen Score. Lasse kein Tag leer. Formulierungen wie «Keine Änderungen erforderlich» sind als Tipp nicht erlaubt.';
   run(prompt, ANALYZE_SYSTEM, analyzeBtn, renderAnalysisXML, ANALYZE_EXAMPLE,
       {retryPrompt, retryExamples: ANALYZE_EXAMPLE, isBad: analysisIsBad, retryMsg:'Antwort unvollständig – zweiter Versuch…'});
 });
