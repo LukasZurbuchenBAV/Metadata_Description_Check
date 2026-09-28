@@ -301,34 +301,24 @@ Gib die Bewertung in XML-Tags aus, in dieser Form:
 <interpretation-score>...</interpretation-score>
 <raeumlicherbezug-score>...</raeumlicherbezug-score>`;
 
-const GENERATE_SYSTEM = `Du bist ein hilfreicher Assistent für ein Bundesamt. Du wirst gebeten, eine Beschreibung für einen Datensatz zu schreiben. Bleibe stets wahrheitsgemäss und objektiv. Schreibe nur, was du anhand der vom Benutzer bereitgestellten Angaben sicher weisst. Mache keine Annahmen. Schreibe einfach und klar. Schreibe immer in deutscher Sprache.
+const GENERATE_SYSTEM = `Du bist ein hilfreicher Assistent für ein Bundesamt und schreibst Beschreibungen für Datensätze. Bleibe wahrheitsgemäss und sachlich. Verwende nur Angaben, die dir der Benutzer gibt, und mache keine Annahmen. Schreibe einfach und klar, immer auf Deutsch.
 
-Schreibe aus den gegebenen Stichworten eine verständliche, prägnante und suchmaschinenoptimierte Datensatzbeschreibung als EIN einziger Fliesstext (keine Überschriften, keine Aufzählung der Kategorien).
+Aufgabe: Formuliere aus den Stichworten EINEN zusammenhängenden Fliesstext von etwa 4 bis 8 Sätzen. Der Text muss sich wie eine natürliche Beschreibung lesen: ganze Sätze mit Übergängen, KEINE Aufzählung, KEINE Nummerierung, KEINE Überschriften und KEINE Bezeichnungen wie "Zweck:" oder "Inhalt:". Übernimm die Stichworte nicht wörtlich, sondern verbinde sie zu Sätzen.
 
-Behandle inhaltlich in dieser Reihenfolge, soweit Angaben vorhanden sind:
-1. Zweck - Wofür dienen die Daten, wozu werden sie verwendet?
-2. Inhalt - Welche Informationen sind enthalten?
-3. Erhebung / Quelle - Wie und wofür wurden die Daten erhoben oder erzeugt, aus welcher Quelle stammen sie?
-4. Vollständigkeit und Aktualität - Wie vollständig und aktuell sind die Daten, gab es Änderungen in der Erhebungsmethode?
-5. Interpretation - Welche Rückschlüsse sind aus den Daten möglich und welche nicht?
-6. Räumlicher Bezug (falls relevant) - In welchem Gebiet oder auf welcher Aggregationsstufe (z. B. Gemeinde, Kanton, Schweiz) liegen die Daten vor?
+Bringe die Informationen in dieser Reihenfolge unter: zuerst der Inhalt (der erste Satz beginnt mit den Worten «Der Datensatz enthält» und wird danach vollständig ausformuliert), dann Zweck, Erhebung und Quelle, Vollständigkeit und Aktualität (inkl. Änderungen der Erhebung), Rückschlüsse die möglich bzw. nicht möglich sind, und zuletzt der räumliche Bezug. Angaben, die nicht vorliegen, lässt du einfach weg und erwähnst keine Lücke.
+Löse gendergerechte Sprache auf und nenne beide Formen, z. B. «Besucherinnen und Besucher».
+Gib nur den fertigen Text zurück, ohne Einleitung und ohne Anführungszeichen.`;
 
-Formuliere alles aus. Wenn zu einem der Punkte keine Angaben vorliegen, lasse diesen Punkt einfach weg statt eine Lücke zu erwähnen.
-Löse gendergerechte Sprache auf und nenne jeweils beide Geschlechter, also z. B. «Besucherinnen und Besucher», «Bürgerinnen und Bürger», «Verkehrsteilnehmerinnen und Verkehrsteilnehmer».
-Beginne die Beschreibung immer mit: "Der Datensatz enthält ..."
-
-Hier ein Beispiel:
-
-Titel: Web Analytics der Open Government Data des Kantons Zürich auf opendata.swiss
-Zweck: Monitoring der Nutzung von OGD-Datensätzen des Kantons Zürich
+const GENERATE_EXAMPLE = [
+  {role:'user', content:`Erstelle den Beschreibungstext für folgenden Datensatz:
+Titel: Web Analytics der Open Government Data des Kantons Zürich
+Zweck: Monitoring der Nutzung von OGD-Datensätzen
 Inhalt: Monatliche Anzahl Besuche pro Metadatensatz, Publikationsdatum, publizierende Organisation, thematische Kategorie
 Erhebung/Quelle: Automatisiert erhobene Web-Analytics-Daten von opendata.swiss
-Vollständigkeit: Ab Januar 2019 um weitere Metadaten erweitert; ab März 2021 pausiert
-Räumlicher Bezug: Kanton Zürich
-
-Beschreibung: "Der Datensatz enthält monatliche Nutzungsstatistiken (Anzahl Besuche) der Open-Government-Data-Metadatensätze von Verwaltungseinheiten und Organen des Kantons Zürich, die auf dem zentralen Katalog opendata.swiss auffindbar sind. Er dient dem Monitoring der Nutzung dieser OGD-Datensätze. Erfasst werden unter anderem Publikationsdatum, publizierende Organisation und thematische Kategorie. Die Web-Analytics-Daten werden automatisiert erhoben. Ab Januar 2019 wurden sie um weitere Metadateninformationen erweitert, ab März 2021 ist die monatliche Aktualisierung pausiert. Die Daten beziehen sich auf den Kanton Zürich."
-
-Gib ausschliesslich den fertigen Beschreibungstext zurück, ohne Einleitung, ohne Überschrift, ohne Anführungszeichen.`;
+Vollständigkeit und Aktualität: Ab Januar 2019 um weitere Metadaten erweitert; ab März 2021 pausiert
+Räumlicher Bezug: Kanton Zürich\n\nSchreibe daraus jetzt einen zusammenhängenden Fliesstext in ganzen Sätzen. Verwende keine Bezeichnungen wie «Zweck:» und übernimm die Stichworte nicht wörtlich.`},
+  {role:'assistant', content:`Der Datensatz enthält monatliche Nutzungsstatistiken (Anzahl Besuche) der Open-Government-Data-Metadatensätze des Kantons Zürich, die auf dem Katalog opendata.swiss auffindbar sind. Erfasst werden zusätzlich das Publikationsdatum, die publizierende Organisation und die thematische Kategorie. Die Daten dienen dem Monitoring der Nutzung dieser Datensätze und stammen aus automatisiert erhobenen Web-Analytics-Daten von opendata.swiss. Ab Januar 2019 wurden sie um weitere Metadateninformationen erweitert, seit März 2021 ist die monatliche Aktualisierung pausiert. Die Daten beziehen sich auf Verwaltungseinheiten und Organe des Kantons Zürich.`}
+];
 
 function renderMarkdownish(text){
   // sehr einfache Umwandlung: ### Überschrift -> Karte, **bold**, - Listen
@@ -375,29 +365,42 @@ function renderAnalysisXML(text){
     return `<div class="cat"><h3>${label} ${badge}</h3>${paras}</div>`;
   }).join('');
 }
+function cleanGenerated(t){
+  return t.replace(/^\s*["«»„“]+|["«»„“]+\s*$/g,'')
+    .replace(/^\s*(#{1,6}\s.*|\*\*[^*]+\*\*:?)\s*$/gm,'')
+    .replace(/^\s*(?:\d+\.|[-*•])\s+/gm,'')
+    .replace(/^\s*(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit[^:\n]*|Interpretation|Räumlicher Bezug)\s*:\s*/gmi,'')
+    .replace(/(?<=[.!?]\s)(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit[^:\n]{0,25}|Interpretation|Räumlicher Bezug)\s*:\s*/g,'')
+    .replace(/\n{3,}/g,'\n\n').trim();
+}
 function renderPlainText(text){
+  text = cleanGenerated(text);
   const paragraphs = text.trim().split(/\n{2,}/).map(p=>`<p>${escapeHtml(p.trim())}</p>`).join('');
   const id = 'gen-' + Date.now();
   return `<div class="cat" id="${id}-src" data-raw="${escapeHtml(text.trim()).replace(/"/g,'&quot;')}">${paragraphs}</div>
     <button class="secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('${id}-src').dataset.raw); this.textContent='Kopiert!'; setTimeout(()=>this.textContent='In Zwischenablage kopieren',1500)">In Zwischenablage kopieren</button>`;
 }
 
-async function run(userPrompt, systemPrompt, btn, renderFn){
+async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}){
   if(!engine){
     resultEl.innerHTML = '<p class="placeholder">Bitte zuerst ein Modell laden.</p>';
     return;
   }
   btn.disabled = true;
   resultEl.innerHTML = '<p class="placeholder">Erzeuge Antwort…</p>';
-  try{
+  const ask = async (prompt, ex) => {
     const reply = await engine.chat.completions.create({
-      messages: [
-        {role:'system', content: systemPrompt},
-        {role:'user', content: userPrompt}
-      ],
+      messages: [{role:'system', content: systemPrompt}, ...ex, {role:'user', content: prompt}],
       temperature: 0.4
     });
-    const text = reply.choices[0].message.content;
+    return reply.choices[0].message.content;
+  };
+  try{
+    let text = await ask(userPrompt, examples);
+    if(opts.isBad && opts.retryPrompt && opts.isBad(text)){
+      resultEl.innerHTML = '<p class="placeholder">Ergebnis war nur eine Auflistung – zweiter Versuch…</p>';
+      text = await ask(opts.retryPrompt, []);
+    }
     resultEl.innerHTML = renderFn(text);
   }catch(err){
     resultEl.innerHTML = `<p class="placeholder">Fehler: ${escapeHtml(err.message)}</p>`;
@@ -421,8 +424,18 @@ generateBtn.addEventListener('click', ()=>{
   const completeness = document.getElementById('completeness').value.trim();
   const interpretation = document.getElementById('interpretation').value.trim();
   const spatial = document.getElementById('spatial').value.trim();
-  const prompt = `Erstelle den Beschreibungstext für folgenden Datensatz:\nTitel: ${title||'(kein Titel angegeben)'}\nZweck: ${purpose||'-'}\nInhalt: ${content||'-'}\nErhebung/Quelle: ${source||'-'}\nVollständigkeit: ${completeness||'-'}\nInterpretation: ${interpretation||'-'}\nRäumlicher Bezug: ${spatial||'-'}`;
-  run(prompt, GENERATE_SYSTEM, generateBtn, renderPlainText);
+  const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
+  const CLOSE = '\n\nSchreibe daraus jetzt einen zusammenhängenden Fliesstext in ganzen Sätzen. Verwende keine Bezeichnungen wie «Zweck:» und übernimm die Stichworte nicht wörtlich.';
+  const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + CLOSE;
+  const end = t => /[.!?]$/.test(t) ? t : t + '.';
+  const prose = [
+    [content,'Was die Daten enthalten'], [purpose,'Wozu sie dienen'], [source,'Woher sie stammen'],
+    [completeness,'Wie vollständig und aktuell sie sind'], [interpretation,'Worauf bei der Deutung zu achten ist'],
+    [spatial,'Auf welches Gebiet sie sich beziehen']
+  ].filter(x=>x[0]).map(x=>`${x[1]}: ${end(x[0])}`).join(' ');
+  const retryPrompt = `Schreibe eine Beschreibung für den Datensatz «${title||'ohne Titel'}» als Fliesstext in ganzen Sätzen, ohne Listen und ohne Bezeichnungen. Der erste Satz beginnt mit «Der Datensatz enthält». ${prose}`;
+  const isBad = t => (t.match(/(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit|Interpretation|Räumlicher Bezug)\s*:/g)||[]).length >= 2 || /enthält\s*(\.\.\.|…)/.test(t);
+  run(prompt, GENERATE_SYSTEM, generateBtn, renderPlainText, GENERATE_EXAMPLE, {retryPrompt, isBad});
 });
 </script>
 </body>
