@@ -21,8 +21,7 @@
   main{max-width:920px;margin:0 auto;padding:24px}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:2px;padding:20px;margin-bottom:20px}
   .modelrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  select,button,textarea,input{font-family:inherit;font-size:0.95rem}
-  select{padding:8px 10px;border:1px solid var(--ink);background:#fff;border-radius:2px}
+  button,textarea,input{font-family:inherit;font-size:0.95rem}
   button{padding:9px 18px;border:2px solid var(--ink);background:var(--ink);color:#fff;
     border-radius:2px;cursor:pointer;font-weight:600}
   button.secondary{background:#fff;color:var(--ink)}
@@ -71,12 +70,10 @@
 <main>
   <div class="panel">
     <div class="modelrow">
-      <label style="margin:0">Modell:</label>
-      <select id="model" disabled><option>lade Modellliste…</option></select>
-      <button id="loadBtn">Modell laden</button>
+      <button id="loadBtn">Modell laden (Llama-3.2-3B-Instruct, ca. 2.2 GB)</button>
     </div>
     <div class="progresswrap" id="progresswrap"><div class="progressbar" id="progressbar"></div></div>
-    <div class="status" id="status">Modell muss beim ersten Mal heruntergeladen werden (mehrere hundert MB bis wenige GB). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).</div>
+    <div class="status" id="status">Modell muss beim ersten Mal heruntergeladen werden (ca. 2.2 GB). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).</div>
   </div>
 
   <div class="panel">
@@ -141,7 +138,10 @@
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.80";
 
-const modelSelect = document.getElementById('model');
+// Festes Modell — hier anpassen, falls das Modell je geändert werden soll.
+const MODEL_ID = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
+const MODEL_SIZE_LABEL = 'ca. 2.2 GB';
+
 const loadBtn = document.getElementById('loadBtn');
 const status = document.getElementById('status');
 const progresswrap = document.getElementById('progresswrap');
@@ -161,30 +161,34 @@ document.querySelectorAll('.tab').forEach(tab=>{
   });
 });
 
-if(!navigator.gpu){
-  status.textContent = 'Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
-  loadBtn.disabled = true;
-} else {
-  const models = webllm.prebuiltAppConfig.model_list
-    .filter(m => /Instruct/i.test(m.model_id) && !/vision|VLM/i.test(m.model_id))
-    .sort((a,b) => (a.vram_required_MB||9e9) - (b.vram_required_MB||9e9));
-  modelSelect.innerHTML = '';
-  models.forEach(m=>{
-    const opt = document.createElement('option');
-    opt.value = m.model_id;
-    const gb = m.vram_required_MB ? (m.vram_required_MB/1024).toFixed(1)+' GB' : '?';
-    opt.textContent = `${m.model_id} (${gb})`;
-    modelSelect.appendChild(opt);
-  });
-  modelSelect.disabled = false;
-  // Kleines, ausgewogenes Modell vorauswählen
-  const pref = models.find(m => /3\.2-3B|Phi-3\.5-mini|Qwen2\.5-3B/i.test(m.model_id));
-  if(pref) modelSelect.value = pref.model_id;
+async function checkWebGpuSupport(){
+  if(!navigator.gpu){
+    return 'Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
+  }
+  try{
+    const adapter = await navigator.gpu.requestAdapter();
+    if(!adapter){
+      return 'Es konnte kein WebGPU-fähiger Grafikadapter gefunden werden. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
+    }
+    if(!adapter.features.has('shader-f16')){
+      return 'Deine Grafikkarte/dein Browser unterstützt die benötigte WebGPU-Erweiterung "shader-f16" nicht. Bitte ein aktuelles Chrome oder Edge (Desktop) mit aktueller Grafiktreiber-Version verwenden.';
+    }
+  }catch(err){
+    return 'WebGPU konnte nicht geprüft werden: ' + err.message;
+  }
+  return null; // alles ok
 }
+
+(async ()=>{
+  const problem = await checkWebGpuSupport();
+  if(problem){
+    status.textContent = problem;
+    loadBtn.disabled = true;
+  }
+})();
 
 loadBtn.addEventListener('click', async ()=>{
   loadBtn.disabled = true;
-  modelSelect.disabled = true;
   analyzeBtn.disabled = true;
   generateBtn.disabled = true;
   progresswrap.style.display = 'block';
@@ -196,13 +200,13 @@ loadBtn.addEventListener('click', async ()=>{
         status.textContent = p.text || 'Lädt…';
       });
     }
-    await engine.reload(modelSelect.value);
+    status.textContent = `Lade Modell ${MODEL_ID} (${MODEL_SIZE_LABEL}, nur beim ersten Mal)…`;
+    await engine.reload(MODEL_ID);
     status.textContent = 'Modell geladen. Bereit.';
     analyzeBtn.disabled = false;
     generateBtn.disabled = false;
   }catch(err){
     status.textContent = 'Fehler beim Laden: ' + err.message;
-    modelSelect.disabled = false;
   }
   loadBtn.disabled = false;
 });
