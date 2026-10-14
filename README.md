@@ -1,4 +1,4 @@
-[README (4).md](https://github.com/user-attachments/files/33426180/README.4.md)
+[README (5).md](https://github.com/user-attachments/files/33432237/README.5.md)
 # MetaFairy (WebLLM-Edition)
 
 Client-seitiger Nachbau von [machinelearningZH/ogd_ai-metafairy](https://github.com/machinelearningZH/ogd_ai-metafairy):
@@ -21,21 +21,27 @@ Kein Build-Schritt nötig – es ist eine einzige statische `index.html`.
 
 1. Seite öffnen (aktuelles **Chrome** oder **Edge** auf Desktop). Der Browser bzw. die Grafikkarte muss
    WebGPU samt Erweiterung `shader-f16` unterstützen – sonst zeigt die Seite eine Fehlermeldung.
-2. Auf **„Modell laden"** klicken. Verwendet wird fest **Llama-3.2-3B-Instruct** (`Llama-3.2-3B-Instruct-q4f16_1-MLC`).
-   Der erste Download (ca. 2,2 GB) dauert etwas und startet erst auf Knopfdruck – danach bleibt das Modell
+2. Auf **„Modell laden"** klicken. Verwendet wird fest **Qwen3-4B** (`Qwen3-4B-q4f16_1-MLC`).
+   Der erste Download (ca. 2,5 GB, Schätzung) dauert etwas und startet erst auf Knopfdruck – danach bleibt das Modell
    im Browser-Cache.
-3. Tab **„Beschreibung analysieren"**: Titel und bestehenden Text einfügen. Ergebnis: pro Achse eine
-   kurze Einschätzung plus Bewertung (1–5).
+3. Oben im Kopf kann die Sprache gewählt werden (**Deutsch, Französisch, Italienisch**). Sie steuert die
+   Oberfläche und die Sprache der Antwort. Die Beschreibung sollte in derselben Sprache vorliegen.
+4. Tab **„Beschreibung analysieren"**: Titel und bestehenden Text einfügen. Ergebnis: pro Achse eine
+   kurze Einschätzung, die **Fundstelle** im Text (wörtliches Zitat, wird per Code gegen den Text geprüft),
+   ein Verbesserungsvorschlag und eine Bewertung (1–5). Die Antwort erscheint live (Streaming).
    Tab **„Beschreibung generieren"**: Stichworte zu den sechs Achsen eintragen und generieren lassen – das
    Ergebnis ist ein einziger, zusammenhängender Fliesstext (kein Feld pro Achse), passend zum
    Beschreibungsfeld in i14y/DCAT-AP-CH.
 
 ## Anpassen
 
-- Modell: Es gibt keine Auswahl im UI. Das Modell steht als Konstante `MODEL_ID` (plus Grössenangabe
+- Modell: Es gibt keine Auswahl im UI. Das Modell (inkl. `enable_thinking: false`) steht als Konstante `MODEL_ID` (plus Grössenangabe
   `MODEL_SIZE_LABEL`) am Anfang des Script-Blocks in `index.html` und kann dort geändert werden. Die
-  Button-Beschriftung und der Hinweistext im HTML nennen Modellname und Grösse ebenfalls und müssen bei
-  einem Wechsel mit angepasst werden.
+  Button-Beschriftung und Hinweistext werden aus diesen Konstanten erzeugt.
+- Sprachen: Texte stehen in `MSG`, `UI`, `PH` (Oberfläche) sowie `ANALYZE_EX`, `GEN_EX`, `OPEN` (Prompt-Beispiele).
+- Geschwindigkeit: Auf integrierter Grafik (z. B. Intel Iris Xe) dauert eine Analyse mehrere Minuten.
+  Temperatur 0.2, Längenlimit und Streaming sind in `run()` gesetzt; ein zweiter Durchlauf erfolgt nur bei
+  unvollständiger Antwort.
 - Prompt/Struktur: `ANALYZE_SYSTEM` (Analyse, strukturiert je Achse) und `GENERATE_SYSTEM` (Generierung, ein
   Fliesstext) in `index.html` anpassen, z. B. auf eure i14y-/BAV-spezifischen Metadatenfelder statt der
   sechs Achsen Zweck, Inhalt, Erhebung/Quelle, Vollständigkeit, Interpretation, Räumlicher Bezug.
