@@ -182,7 +182,11 @@ const MSG = {
   src: ['Fundstelle:', 'Passage :', 'Passaggio:'],
   tokens: ['Tokens', 'tokens', 'token'],
   copy: ['In Zwischenablage kopieren', 'Copier dans le presse-papiers', 'Copia negli appunti'],
-  copied: ['Kopiert!', 'Copié !', 'Copiato!']
+  copied: ['Kopiert!', 'Copié !', 'Copiato!'],
+  disc: ['Hinweis: Dieses Ergebnis stammt von einer kleinen KI, die lokal in deinem Browser läuft. Sie kann sich irren, Angaben übersehen oder zu streng bzw. zu milde bewerten und liefert nicht bei jedem Durchlauf dasselbe. Bitte als Anregung verstehen und selbst prüfen.',
+         'Remarque : ce résultat provient d’une petite IA qui tourne localement dans votre navigateur. Elle peut se tromper, manquer des informations ou évaluer trop sévèrement ou trop généreusement, et ne donne pas toujours le même résultat. À considérer comme une suggestion, à vérifier soi-même.',
+         'Nota: questo risultato proviene da una piccola IA che gira localmente nel browser. Può sbagliare, trascurare informazioni o valutare in modo troppo severo o troppo indulgente e non dà sempre lo stesso risultato. Da intendere come suggerimento, da verificare personalmente.'],
+  dur: ['Dauer', 'Durée', 'Durata']
 };
 const m = k => MSG[k][LI[lang]];
 
@@ -377,6 +381,7 @@ function renderAnalysisXML(text){
     if(ok && NONE.test(body)){ contra = true; body = m('found'); if(!sc || +sc < 3) sc = '3'; }
     else if(!ok && NONE.test(body)) sc = '1';
     else if(!ok && sc && +sc > 3) sc = '3';
+    if(ok && (!sc || +sc < 4)) sc = '4'; // Angabe belegt im Text = mindestens 4/5
     const filler = !tip || contra || (ok && wordsIn(tip, srcN) >= 0.6) || /^\s*[–-]\s*$/.test(tip) || FILLER.test(tip);
     const tipText = !filler ? tip : (!ok && sc && +sc <= 3 ? DT[lang][i] : '');
     const tipLabel = !filler ? m('tip') : m('tipDef');
@@ -425,29 +430,29 @@ const OPEN = {de:'Der Datensatz enthält', fr:'Le jeu de données contient', it:
 const mkEx = (user, rows) => [{role:'user', content:user}, {role:'assistant', content: rows.map(([k,b,t,tp,sc])=>`<${k}-beleg>${b}</${k}-beleg>\n<${k}>${t}</${k}>\n<${k}-tipp>${tp}</${k}-tipp>\n<${k}-score>${sc}</${k}-score>`).join('\n')}];
 const ANALYZE_EX = {
   de: mkEx(`Titel: Grundwasserqualität an Messstellen des Kantons Bern\nBeschreibung: Die Daten zeigen Nitrat- und Pestizidwerte an rund 120 Messstellen. Sie werden vom Amt für Wasser und Abfall jährlich im Rahmen der Gewässerschutzverordnung gemessen und im Frühjahr aktualisiert. Die Werte erlauben keine Aussage über die Trinkwasserqualität an einzelnen Haushalten.`, [
-    ['titel','Grundwasserqualität an Messstellen des Kantons Bern','Klar und verständlich, ohne Abkürzungen.','Thema «Nitrat und Pestizide» im Titel ergänzen.','4'],
+    ['titel','Grundwasserqualität an Messstellen des Kantons Bern','Klar und verständlich, ohne Abkürzungen.','Thema «Nitrat und Pestizide» im Titel ergänzen.','5'],
     ['zweck','keine','Es wird nicht erklärt, wofür die Daten verwendet werden.','Verwendungszweck nennen, z. B. Überwachung des Gewässerschutzes.','2'],
     ['inhalt','Nitrat- und Pestizidwerte an rund 120 Messstellen','Messwerte und Umfang sind klar benannt.','Einheiten der Werte angeben.','4'],
     ['erhebung','vom Amt für Wasser und Abfall jährlich im Rahmen der Gewässerschutzverordnung gemessen','Erhebende Stelle, Rhythmus und Rechtsgrundlage sind genannt.','Messmethode kurz beschreiben.','4'],
-    ['vollstaendigkeit','im Frühjahr aktualisiert','Die Aktualisierung ist genannt, Lücken und Änderungen nicht.','Angeben, ob sich die Messmethode geändert hat.','3'],
-    ['interpretation','erlauben keine Aussage über die Trinkwasserqualität an einzelnen Haushalten','Eine Grenze der Aussagekraft ist benannt.','Weitere Grenzen nennen, z. B. Schwankungen zwischen Jahren.','4'],
-    ['raeumlicherbezug','Messstellen des Kantons Bern','Der Raum ist klar benannt.','Aggregationsstufe nennen, z. B. je Messstelle.','3']]),
+    ['vollstaendigkeit','im Frühjahr aktualisiert','Die Aktualisierung ist genannt, Lücken und Änderungen nicht.','Angeben, ob sich die Messmethode geändert hat.','4'],
+    ['interpretation','erlauben keine Aussage über die Trinkwasserqualität an einzelnen Haushalten','Eine Grenze der Aussagekraft ist benannt.','Weitere Grenzen nennen, z. B. Schwankungen zwischen Jahren.','5'],
+    ['raeumlicherbezug','Messstellen des Kantons Bern','Der Raum ist klar benannt.','Aggregationsstufe nennen, z. B. je Messstelle.','4']]),
   fr: mkEx(`Titel: Qualité des eaux souterraines aux points de mesure du canton de Berne\nBeschreibung: Les données présentent les teneurs en nitrates et en pesticides à environ 120 points de mesure. Elles sont mesurées chaque année par l’Office de l’eau et des déchets, dans le cadre de l’ordonnance sur la protection des eaux, et mises à jour au printemps. Les valeurs ne permettent aucune conclusion sur la qualité de l’eau potable de ménages individuels.`, [
-    ['titel',`Qualité des eaux souterraines aux points de mesure du canton de Berne`,`Clair et compréhensible, sans abréviations.`,`Ajouter le thème « nitrates et pesticides » dans le titre.`,'4'],
+    ['titel',`Qualité des eaux souterraines aux points de mesure du canton de Berne`,`Clair et compréhensible, sans abréviations.`,`Ajouter le thème « nitrates et pesticides » dans le titre.`,'5'],
     ['zweck','aucun',`Il n’est pas indiqué à quoi servent les données.`,`Indiquer l’usage, p. ex. surveillance de la protection des eaux.`,'2'],
     ['inhalt',`teneurs en nitrates et en pesticides à environ 120 points de mesure`,`Les valeurs mesurées et l’étendue sont clairement nommées.`,`Indiquer les unités des valeurs.`,'4'],
     ['erhebung',`mesurées chaque année par l’Office de l’eau et des déchets, dans le cadre de l’ordonnance sur la protection des eaux`,`Le service, le rythme et la base légale sont mentionnés.`,`Décrire brièvement la méthode de mesure.`,'4'],
-    ['vollstaendigkeit',`mises à jour au printemps`,`La mise à jour est mentionnée, pas les lacunes ni les changements.`,`Indiquer si la méthode de mesure a changé.`,'3'],
-    ['interpretation',`ne permettent aucune conclusion sur la qualité de l’eau potable de ménages individuels`,`Une limite de la portée des données est mentionnée.`,`Mentionner d’autres limites, p. ex. variations entre années.`,'4'],
-    ['raeumlicherbezug',`points de mesure du canton de Berne`,`L’espace est clairement nommé.`,`Indiquer le niveau d’agrégation, p. ex. par point de mesure.`,'3']]),
+    ['vollstaendigkeit',`mises à jour au printemps`,`La mise à jour est mentionnée, pas les lacunes ni les changements.`,`Indiquer si la méthode de mesure a changé.`,'4'],
+    ['interpretation',`ne permettent aucune conclusion sur la qualité de l’eau potable de ménages individuels`,`Une limite de la portée des données est mentionnée.`,`Mentionner d’autres limites, p. ex. variations entre années.`,'5'],
+    ['raeumlicherbezug',`points de mesure du canton de Berne`,`L’espace est clairement nommé.`,`Indiquer le niveau d’agrégation, p. ex. par point de mesure.`,'4']]),
   it: mkEx(`Titel: Qualità delle acque sotterranee nei punti di misura del Cantone di Berna\nBeschreibung: I dati mostrano i valori di nitrati e pesticidi in circa 120 punti di misura. Sono misurati ogni anno dall’Ufficio dell’acqua e dei rifiuti, nell’ambito dell’ordinanza sulla protezione delle acque, e aggiornati in primavera. I valori non permettono conclusioni sulla qualità dell’acqua potabile di singole economie domestiche.`, [
-    ['titel',`Qualità delle acque sotterranee nei punti di misura del Cantone di Berna`,`Chiaro e comprensibile, senza abbreviazioni.`,`Aggiungere il tema «nitrati e pesticidi» nel titolo.`,'4'],
+    ['titel',`Qualità delle acque sotterranee nei punti di misura del Cantone di Berna`,`Chiaro e comprensibile, senza abbreviazioni.`,`Aggiungere il tema «nitrati e pesticidi» nel titolo.`,'5'],
     ['zweck','nessuno',`Non è spiegato a cosa servano i dati.`,`Indicare l’uso, ad es. sorveglianza della protezione delle acque.`,'2'],
     ['inhalt',`i valori di nitrati e pesticidi in circa 120 punti di misura`,`I valori misurati e l’estensione sono chiaramente indicati.`,`Indicare le unità dei valori.`,'4'],
     ['erhebung',`misurati ogni anno dall’Ufficio dell’acqua e dei rifiuti, nell’ambito dell’ordinanza sulla protezione delle acque`,`Servizio, cadenza e base legale sono indicati.`,`Descrivere brevemente il metodo di misura.`,'4'],
-    ['vollstaendigkeit',`aggiornati in primavera`,`L’aggiornamento è indicato, lacune e modifiche no.`,`Indicare se il metodo di misura è cambiato.`,'3'],
-    ['interpretation',`non permettono conclusioni sulla qualità dell’acqua potabile di singole economie domestiche`,`È indicato un limite della validità dei dati.`,`Indicare altri limiti, ad es. variazioni tra gli anni.`,'4'],
-    ['raeumlicherbezug',`punti di misura del Cantone di Berna`,`L’area è chiaramente indicata.`,`Indicare il livello di aggregazione, ad es. per punto di misura.`,'3']])
+    ['vollstaendigkeit',`aggiornati in primavera`,`L’aggiornamento è indicato, lacune e modifiche no.`,`Indicare se il metodo di misura è cambiato.`,'4'],
+    ['interpretation',`non permettono conclusioni sulla qualità dell’acqua potabile di singole economie domestiche`,`È indicato un limite della validità dei dati.`,`Indicare altri limiti, ad es. variazioni tra gli anni.`,'5'],
+    ['raeumlicherbezug',`punti di misura del Cantone di Berna`,`L’area è chiaramente indicata.`,`Indicare il livello di aggregazione, ad es. per punto di misura.`,'4']])
 };
 const GCLOSE = '\n\nSchreibe daraus jetzt einen zusammenhängenden Fliesstext in ganzen Sätzen. Verwende keine Bezeichnungen wie «Zweck:» und übernimm die Stichworte nicht wörtlich.';
 const GEN_EX = {
@@ -461,6 +466,7 @@ const GEN_EX = {
 async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}){
   if(!engine){ resultEl.innerHTML = `<p class="placeholder">${m('first')}</p>`; return; }
   btn.disabled = true;
+  let stat = '';
   systemPrompt = systemPrompt.replace('immer auf Deutsch', 'immer auf ' + LANG_NAME[lang]).replaceAll('Der Datensatz enthält', OPEN[lang]);
   const ask = async (prompt, ex, label) => {
     const t0 = performance.now(); let acc = '', n = 0;
@@ -476,6 +482,8 @@ async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}
         resultEl.innerHTML = `<p class="placeholder">${label} ${n} ${m('tokens')} · ${tps} tok/s</p><pre style="white-space:pre-wrap;font-size:0.8rem;color:var(--muted)">${escapeHtml(acc)}</pre>`;
       }
     }
+    const secs = (performance.now()-t0)/1000;
+    stat = secs.toFixed(0) + ' s · ' + (n/secs).toFixed(1) + ' tok/s';
     return acc.replace(/<think>[\s\S]*?<\/think>/g, '');
   };
   try{
@@ -489,7 +497,8 @@ async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}
       html = `<p class="placeholder">${m('partial')}</p>` + html +
         `<details style="margin-top:12px"><summary class="placeholder">${m('raw')}</summary><pre style="white-space:pre-wrap;font-size:0.8rem">${escapeHtml(text)}</pre></details>`;
     }
-    resultEl.innerHTML = html;
+    const notice = `<div style="border:1px solid var(--line);background:#fff8e1;padding:8px 12px;font-size:0.85rem;margin-bottom:12px">⚠️ ${m('disc')}</div>`;
+    resultEl.innerHTML = notice + html + `<p class="placeholder" style="font-size:0.8rem">${m('dur')}: ${stat}</p>`;
   }catch(err){
     resultEl.innerHTML = `<p class="placeholder">${m('err')}${escapeHtml(err.message)}</p>`;
   }
