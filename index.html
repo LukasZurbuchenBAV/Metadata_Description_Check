@@ -56,6 +56,7 @@
   .placeholder{color:var(--muted);font-style:italic;font-size:0.9rem}
   footer{max-width:920px;margin:0 auto;padding:10px 24px 40px;color:var(--muted);font-size:0.8rem}
   a{color:var(--red-dark)}
+  #lang{margin-top:8px;padding:4px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -64,6 +65,7 @@
   <div>
     <h1>Meta<span>Fairy</span></h1>
     <div class="sub">Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die KI läuft komplett lokal im Browser, keine Daten verlassen dein Gerät.</div>
+    <select id="lang" aria-label="Sprache / Langue / Lingua"><option value="de">Deutsch</option><option value="fr">Français</option><option value="it">Italiano</option></select>
   </div>
 </header>
 
@@ -139,8 +141,9 @@
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.80";
 
 // Festes Modell — hier anpassen, falls das Modell je geändert werden soll.
-const MODEL_ID = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
-const MODEL_SIZE_LABEL = 'ca. 2.2 GB';
+const MODEL_ID = 'Qwen3-4B-q4f16_1-MLC';
+const MODEL_NAME = 'Qwen3-4B';
+const MODEL_SIZE_LABEL = 'ca. 2.5 GB';
 
 const loadBtn = document.getElementById('loadBtn');
 const status = document.getElementById('status');
@@ -150,7 +153,86 @@ const analyzeBtn = document.getElementById('analyzeBtn');
 const generateBtn = document.getElementById('generateBtn');
 const resultEl = document.getElementById('result');
 
-let engine = null;
+let engine = null, lang = 'de', modelReady = false, loading = false, gpuProblem = null;
+const LI = {de:0, fr:1, it:2};
+const LANG_NAME = {de:'Deutsch', fr:'Französisch', it:'Italienisch'};
+const S = MODEL_SIZE_LABEL;
+const MSG = {
+  loadBtn: [`Modell laden (${MODEL_NAME}, ${S})`, `Charger le modèle (${MODEL_NAME}, ${S})`, `Carica il modello (${MODEL_NAME}, ${S})`],
+  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).`,
+         `Le modèle doit être téléchargé la première fois (${S}). Nécessite un navigateur avec WebGPU (Chrome ou Edge récent).`,
+         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede un browser con WebGPU (Chrome o Edge aggiornato).`],
+  loading: [`Lade Modell ${MODEL_NAME} (${S}, nur beim ersten Mal)…`, `Chargement du modèle ${MODEL_NAME} (${S}, seulement la première fois)…`, `Caricamento del modello ${MODEL_NAME} (${S}, solo la prima volta)…`],
+  ready: ['Modell geladen. Bereit.', 'Modèle chargé. Prêt.', 'Modello caricato. Pronto.'],
+  loadErr: ['Fehler beim Laden: ', 'Erreur de chargement : ', 'Errore di caricamento: '],
+  noGpu: ['Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Ce navigateur ne prend pas en charge WebGPU. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Questo browser non supporta WebGPU. Usa Chrome o Edge (desktop) aggiornato.'],
+  noAdapter: ['Es wurde kein WebGPU-fähiger Grafikadapter gefunden. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Aucune carte graphique compatible WebGPU trouvée. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Nessuna scheda grafica compatibile con WebGPU trovata. Usa Chrome o Edge (desktop) aggiornato.'],
+  noF16: ['Deine Grafikkarte bzw. dein Browser unterstützt die benötigte WebGPU-Erweiterung «shader-f16» nicht. Bitte aktuelles Chrome oder Edge (Desktop) mit aktuellem Grafiktreiber verwenden.', 'Votre carte graphique ou navigateur ne prend pas en charge l’extension WebGPU «shader-f16». Utilisez Chrome ou Edge récent avec un pilote graphique à jour.', 'La tua scheda grafica o il browser non supporta l’estensione WebGPU «shader-f16». Usa Chrome o Edge aggiornato con driver grafici aggiornati.'],
+  noCheck: ['WebGPU konnte nicht geprüft werden.', 'WebGPU n’a pas pu être vérifié.', 'Impossibile verificare WebGPU.'],
+  first: ['Bitte zuerst ein Modell laden.', 'Veuillez d’abord charger un modèle.', 'Carica prima un modello.'],
+  working: ['Erzeuge Antwort…', 'Génération de la réponse…', 'Generazione della risposta…'],
+  retry: ['Antwort unvollständig – zweiter Versuch…', 'Réponse incomplète – deuxième essai…', 'Risposta incompleta – secondo tentativo…'],
+  err: ['Fehler: ', 'Erreur : ', 'Errore: '],
+  partial: ['Hinweis: Das Modell hat die Vorgaben nur teilweise eingehalten. Ergebnis mit Vorsicht lesen.', 'Remarque : le modèle n’a respecté les consignes qu’en partie. À lire avec prudence.', 'Nota: il modello ha rispettato le istruzioni solo in parte. Leggere con cautela.'],
+  raw: ['Rohantwort des Modells anzeigen', 'Afficher la réponse brute du modèle', 'Mostra la risposta grezza del modello'],
+  tip: ['Verbesserung:', 'Amélioration :', 'Miglioramento:'],
+  tipDef: ['Verbesserung (Standardhinweis):', 'Amélioration (indication standard) :', 'Miglioramento (indicazione standard):'],
+  found: ['Im Text enthalten.', 'Présent dans le texte.', 'Presente nel testo.'],
+  none: ['Keine Angabe.', 'Aucune indication.', 'Nessuna indicazione.'],
+  src: ['Fundstelle:', 'Passage :', 'Passaggio:'],
+  tokens: ['Tokens', 'tokens', 'token'],
+  copy: ['In Zwischenablage kopieren', 'Copier dans le presse-papiers', 'Copia negli appunti'],
+  copied: ['Kopiert!', 'Copié !', 'Copiato!']
+};
+const m = k => MSG[k][LI[lang]];
+
+const UI = {
+  'Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die KI läuft komplett lokal im Browser, keine Daten verlassen dein Gerät.': ['Vérifier et rédiger des descriptions de jeux de données OGD – l’IA tourne entièrement dans le navigateur, aucune donnée ne quitte votre appareil.', 'Verificare e redigere descrizioni di set di dati OGD – l’IA gira interamente nel browser, nessun dato lascia il tuo dispositivo.'],
+  'Beschreibung analysieren': ['Analyser la description', 'Analizza la descrizione'],
+  'Beschreibung generieren': ['Générer la description', 'Genera la descrizione'],
+  'Titel des Datensatzes': ['Titre du jeu de données', 'Titolo del set di dati'],
+  'Bestehende Beschreibung': ['Description existante', 'Descrizione esistente'],
+  'Zweck': ['But', 'Scopo'], 'Inhalt': ['Contenu', 'Contenuto'],
+  'Erhebung / Quelle': ['Collecte / Source', 'Rilevazione / Fonte'],
+  'Vollständigkeit und Aktualität': ['Complétude et actualité', 'Completezza e attualità'],
+  'Interpretation': ['Interprétation', 'Interpretazione'],
+  'Räumlicher Bezug': ['Référence spatiale', 'Riferimento spaziale'],
+  'Läuft vollständig client-seitig über': ['Fonctionne entièrement côté client via', 'Funziona interamente lato client tramite'],
+  '. Keine API-Keys, keine Server-Kosten. Nach dem Vorbild von': ['. Pas de clés API, pas de frais de serveur. Inspiré de', '. Nessuna chiave API, nessun costo di server. Ispirato a'],
+  '(MIT-Lizenz).': ['(licence MIT).', '(licenza MIT).']
+};
+const PH = {
+  analyzeTitle: [`p. ex. Trafic combiné transalpin : volumes et comptes de résultats`, `ad es. Traffico combinato attraverso le Alpi: quantità e conti economici`],
+  title: [`p. ex. Trafic combiné transalpin : volumes et comptes de résultats`, `ad es. Traffico combinato attraverso le Alpi: quantità e conti economici`],
+  existing: [`p. ex. Les données servent à calculer les indemnités d’exploitation du trafic combiné non accompagné à travers les Alpes. La base légale est la loi sur le transfert du transport de marchandises…`, `ad es. I dati servono a calcolare le indennità d’esercizio del traffico combinato non accompagnato attraverso le Alpi. La base legale è la legge sul trasferimento del traffico merci…`],
+  purpose: [`p. ex. Calcul des indemnités d’exploitation du trafic combiné non accompagné à travers les Alpes`, `ad es. Calcolo delle indennità d’esercizio del traffico combinato non accompagnato attraverso le Alpi`],
+  content: [`p. ex. Quantités prévues et effectives (nombre de trains, d’envois) et comptes de résultats par relation`, `ad es. Quantità previste ed effettive (numero di treni, di spedizioni) e conti economici per relazione`],
+  source: [`p. ex. Saisies par les opérateurs du trafic combiné ; base légale : loi sur le transfert du transport de marchandises`, `ad es. Inseriti dagli operatori del traffico combinato; base legale: legge sul trasferimento del traffico merci`],
+  completeness: [`p. ex. Mise à jour annuelle ; modifications de la collecte consignées par année de rapport`, `ad es. Aggiornamento annuale; modifiche della rilevazione annotate per anno di riferimento`],
+  interpretation: [`p. ex. Uniquement les trafics donnant droit à une indemnité ; aucune conclusion sur l’ensemble du trafic marchandises ferroviaire`, `ad es. Solo i traffici con diritto a indennità; nessuna conclusione sull’intero traffico merci ferroviario`],
+  spatial: [`p. ex. Trafic transalpin via les axes du Gothard et du Lötschberg-Simplon, par relation`, `ad es. Traffico attraverso le Alpi sugli assi del Gottardo e del Lötschberg-Sempione, per relazione`]
+};
+const origText = new WeakMap();
+function applyLang(){
+  const L = LI[lang];
+  document.documentElement.lang = lang;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while((n = walker.nextNode())){
+    if(n.parentElement.closest('script,style,option,#loadBtn,#status')) continue;
+    if(!origText.has(n)) origText.set(n, n.nodeValue);
+    const orig = origText.get(n), core = orig.trim();
+    if(UI[core]) n.nodeValue = orig.replace(core, L === 0 ? core : UI[core][L-1]);
+  }
+  document.querySelectorAll('textarea[id],input[id]').forEach(el=>{
+    if(!PH[el.id]) return;
+    if(el.dataset.ph0 === undefined) el.dataset.ph0 = el.placeholder;
+    el.placeholder = L === 0 ? el.dataset.ph0 : PH[el.id][L-1];
+  });
+  loadBtn.textContent = m('loadBtn');
+  if(!modelReady && !loading) status.textContent = gpuProblem ? m(gpuProblem) : m('hint');
+}
+document.getElementById('lang').addEventListener('change', e=>{ lang = e.target.value; applyLang(); });
 
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
@@ -162,52 +244,42 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 async function checkWebGpuSupport(){
-  if(!navigator.gpu){
-    return 'Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
-  }
+  if(!navigator.gpu) return 'noGpu';
   try{
     const adapter = await navigator.gpu.requestAdapter();
-    if(!adapter){
-      return 'Es konnte kein WebGPU-fähiger Grafikadapter gefunden werden. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.';
-    }
-    if(!adapter.features.has('shader-f16')){
-      return 'Deine Grafikkarte/dein Browser unterstützt die benötigte WebGPU-Erweiterung "shader-f16" nicht. Bitte ein aktuelles Chrome oder Edge (Desktop) mit aktueller Grafiktreiber-Version verwenden.';
-    }
-  }catch(err){
-    return 'WebGPU konnte nicht geprüft werden: ' + err.message;
-  }
-  return null; // alles ok
+    if(!adapter) return 'noAdapter';
+    if(!adapter.features.has('shader-f16')) return 'noF16';
+  }catch(err){ return 'noCheck'; }
+  return null;
 }
-
+applyLang();
 (async ()=>{
-  const problem = await checkWebGpuSupport();
-  if(problem){
-    status.textContent = problem;
-    loadBtn.disabled = true;
-  }
+  gpuProblem = await checkWebGpuSupport();
+  if(gpuProblem) loadBtn.disabled = true;
+  applyLang();
 })();
 
 loadBtn.addEventListener('click', async ()=>{
-  loadBtn.disabled = true;
-  analyzeBtn.disabled = true;
-  generateBtn.disabled = true;
+  loadBtn.disabled = true; loading = true;
+  analyzeBtn.disabled = true; generateBtn.disabled = true;
   progresswrap.style.display = 'block';
   try{
     if(!engine){
       engine = new webllm.MLCEngine();
       engine.setInitProgressCallback((p)=>{
         progressbar.style.width = Math.round((p.progress||0)*100)+'%';
-        status.textContent = p.text || 'Lädt…';
+        status.textContent = p.text || '…';
       });
     }
-    status.textContent = `Lade Modell ${MODEL_ID} (${MODEL_SIZE_LABEL}, nur beim ersten Mal)…`;
+    status.textContent = m('loading');
     await engine.reload(MODEL_ID);
-    status.textContent = 'Modell geladen. Bereit.';
-    analyzeBtn.disabled = false;
-    generateBtn.disabled = false;
+    modelReady = true;
+    status.textContent = m('ready');
+    analyzeBtn.disabled = false; generateBtn.disabled = false;
   }catch(err){
-    status.textContent = 'Fehler beim Laden: ' + err.message;
+    status.textContent = m('loadErr') + err.message;
   }
+  loading = false;
   loadBtn.disabled = false;
 });
 
@@ -237,39 +309,15 @@ Bewerte nach diesen sieben Kriterien:
 6. interpretation - welche Rückschlüsse möglich sind und welche NICHT
 7. raeumlicherbezug - gemeinter Raum bzw. Aggregationsstufe (falls relevant)
 
-Zu JEDEM Kriterium gibst du drei Dinge an:
-- Einschätzung: 1-2 Sätze, was der Text dazu enthält (oder "Keine Angabe.").
-- Tipp: ein konkreter Verbesserungsvorschlag, was fehlt oder geändert bzw. ergänzt werden sollte. Der Tipp ist IMMER Pflicht, nennt eine konkrete Ergänzung oder Änderung (auch bei guten Bewertungen, dann eine mögliche Verfeinerung) und wiederholt nicht die Einschätzung. Formulierungen wie «Keine Änderungen erforderlich» sind verboten. Schreibe nie «Keine Änderungen erforderlich» oder Ähnliches, sondern nenne immer etwas Konkretes.
-- Score von 1 bis 5. Sei klar, hart und kritisch.
+Zu JEDEM Kriterium gibst du vier Dinge an:
+- Beleg: der Satz oder Satzteil aus dem Text, der dieses Kriterium abdeckt, WÖRTLICH kopiert. Steht dazu nichts im Text, schreibe «keine». Lies den ganzen Text sorgfältig, bevor du «keine» schreibst.
+- Einschätzung: 1-2 Sätze, was der Text dazu enthält. Gibt es einen Beleg, ist die Angabe vorhanden und darf nie als fehlend bezeichnet werden.
+- Tipp: ein kurzer Vorschlag (ein Satz), was im Text noch FEHLT. Schlage nie vor, was schon im Text steht. Ist alles vorhanden, schreibe eine kleine sprachliche Verfeinerung oder «–».
+- Score von 1 bis 5. Sei sachlich und prüfe genau.
 1 = keine Informationen, 2 = wenige Informationen, viel fehlt, 3 = mittelmässig, einiges fehlt, 4 = gut, das meiste ist vorhanden, 5 = exzellent, klar, vollständig und detailliert.
 
-Antworte ausschliesslich im XML-Format der Beispielantwort: Für alle sieben Kriterien je ein Tag mit dem Kriteriumsnamen (Einschätzung), ein Tag mit dem Zusatz -tipp und ein Tag mit dem Zusatz -score. Kein Tag darf leer bleiben.`;
+Antworte ausschliesslich im XML-Format der Beispielantwort: je Kriterium die Tags NAME-beleg, NAME (Einschätzung), NAME-tipp und NAME-score. Kein Tag darf leer bleiben.`;
 
-const ANALYZE_EXAMPLE = [
-  {role:'user', content:`Titel: Web Analytics der Open Government Data des Kantons Zürich auf opendata.swiss von Februar 2018 bis Februar 2021
-Beschreibung: Monatliche Nutzungsstatistiken (Anzahl Besuche) der Open Government Data (OGD) Metadatensätze von Verwaltungseinheiten und Organen des Kantons Zürich, die auf dem zentralen Katalog für offene Behördendaten opendata.swiss findbar sind. Hinweise: Ab Januar 2019 sind die Web Analytics um weitere Metadateninformationen erweitert worden. Ab März 2021 sind die monatlichen Aktualisierungen aufgrund technischer Herausforderungen pausiert. Variablendefinitionen: 'name' = dataset slug; 'issued' = first publication of dataset; 'organization_name' = publisher slug.`},
-  {role:'assistant', content:`<titel>Klar und verständlich, beschreibt den Inhalt, ist aber lang und enthält eine Datumsangabe.</titel>
-<titel-tipp>Zeitraum aus dem Titel streichen und kürzer fassen, z. B. «Nutzung der Open Government Data des Kantons Zürich».</titel-tipp>
-<titel-score>3</titel-score>
-<zweck>Es wird nicht erklärt, wofür die Nutzungsstatistiken verwendet werden.</zweck>
-<zweck-tipp>Angeben, wozu die Auswertung dient, z. B. Monitoring oder Reporting.</zweck-tipp>
-<zweck-score>2</zweck-score>
-<inhalt>Monatliche Besuchszahlen der OGD-Metadatensätze inklusive Variablendefinitionen sind klar beschrieben.</inhalt>
-<inhalt-tipp>Die Variablendefinitionen auf Deutsch statt Englisch formulieren.</inhalt-tipp>
-<inhalt-score>4</inhalt-score>
-<erhebung>Es ist klar, dass es Web-Analytics-Daten von opendata.swiss sind.</erhebung>
-<erhebung-tipp>Erhebungsmethode bzw. verwendetes Analyse-Tool nennen und angeben, wer die Daten erhebt.</erhebung-tipp>
-<erhebung-score>3</erhebung-score>
-<vollstaendigkeit>Änderungen in der Erhebung (Erweiterung ab Januar 2019, Pause ab März 2021) sind benannt.</vollstaendigkeit>
-<vollstaendigkeit-tipp>Angeben, ob und wann die Aktualisierung wieder aufgenommen wird.</vollstaendigkeit-tipp>
-<vollstaendigkeit-score>4</vollstaendigkeit-score>
-<interpretation>Keine Hinweise, welche Rückschlüsse aus den Daten nicht möglich sind.</interpretation>
-<interpretation-tipp>Grenzen nennen, z. B. dass Besuche keine Aussage über die tatsächliche Nutzung der Daten erlauben.</interpretation-tipp>
-<interpretation-score>2</interpretation-score>
-<raeumlicherbezug>Die Daten beziehen sich klar auf den Kanton Zürich.</raeumlicherbezug>
-<raeumlicherbezug-tipp>Aggregationsstufe explizit nennen, z. B. je Metadatensatz und Verwaltungseinheit.</raeumlicherbezug-tipp>
-<raeumlicherbezug-score>4</raeumlicherbezug-score>`}
-];
 
 const GENERATE_SYSTEM = `Du bist ein hilfreicher Assistent für ein Bundesamt und schreibst Beschreibungen für Datensätze. Bleibe wahrheitsgemäss und sachlich. Verwende nur Angaben, die dir der Benutzer gibt, und mache keine Annahmen. Schreibe einfach und klar, immer auf Deutsch.
 
@@ -279,7 +327,7 @@ Bringe die Informationen in dieser Reihenfolge unter: zuerst der Inhalt (der ers
 Löse gendergerechte Sprache auf und nenne beide Formen, z. B. «Besucherinnen und Besucher».
 Gib nur den fertigen Text zurück, ohne Einleitung und ohne Anführungszeichen.`;
 
-const GENERATE_EXAMPLE = [
+const GEN_EX_DE = [
   {role:'user', content:`Erstelle den Beschreibungstext für folgenden Datensatz:
 Titel: Web Analytics der Open Government Data des Kantons Zürich
 Zweck: Monitoring der Nutzung von OGD-Datensätzen
@@ -315,42 +363,35 @@ function extractTag(text, tag){
   const m = text.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'));
   return m ? m[1].trim() : '';
 }
-const DEFAULT_TIPS = {
-  titel: 'Titel kurz, klar und für Laien verständlich formulieren; Abkürzungen, Gesetzesartikel, Dateinamen und Unterstriche vermeiden.',
-  zweck: 'Beschreiben, wofür die Daten dienen bzw. verwendet werden können.',
-  inhalt: 'Erläutern, welche Informationen (Variablen, Umfang) in den Daten enthalten sind.',
-  erhebung: 'Angeben, wie und wofür die Daten erhoben oder erzeugt wurden und aus welcher Quelle sie stammen.',
-  vollstaendigkeit: 'Angeben, wie vollständig und aktuell die Daten sind und ob es Änderungen in der Erhebungsmethode gab.',
-  interpretation: 'Beschreiben, welche Rückschlüsse aus den Daten möglich sind und welche nicht.',
-  raeumlicherbezug: 'Falls relevant: Gebiet oder Aggregationsstufe (z. B. Gemeinde, Kanton, Schweiz) nennen.'
-};
-const FILLER = /(keine|nicht)\s+(\w+\s+){0,2}(erforderlich|nötig|notwendig)|keine\s+(änderung|verbesserung|ergänzung|anpassung)/i;
+const FILLER = /(keine|nicht)\s+(\w+\s+){0,2}(erforderlich|nötig|notwendig)|keine\s+(änderung|verbesserung|ergänzung|anpassung)|(pas de|aucun[e]?|nessun[ao]?)\s+(\w+\s+){0,2}(modification|amélioration|ajout|modifica|miglioramento|aggiunta)/i;
 function renderAnalysisXML(text){
-  const axes = [
-    ['titel','Titel'], ['zweck','Zweck'], ['inhalt','Inhalt'], ['erhebung','Erhebung / Quelle'],
-    ['vollstaendigkeit','Vollständigkeit'], ['interpretation','Interpretation'],
-    ['raeumlicherbezug','Räumlicher Bezug']
-  ];
-  if(!axes.some(([tag])=> extractTag(text, tag))) return renderMarkdownish(text); // Fallback
-  return axes.map(([tag, label])=>{
-    const body = extractTag(text, tag) || 'Keine Angabe.';
+  const L = LI[lang], srcN = lastSource;
+  if(!ANALYSIS_TAGS.some(k=> extractTag(text, k))) return renderMarkdownish(text); // Fallback
+  return ANALYSIS_TAGS.map((tag,i)=>{
+    const beleg = extractTag(text, tag+'-beleg');
+    const ok = supported(beleg, srcN);
+    let body = extractTag(text, tag) || m('none');
     const tip = extractTag(text, tag+'-tipp');
-    const found = extractTag(text, tag+'-score').match(/[1-5]/);
-    const sc = /^\s*keine angabe/i.test(body) ? '1' : (found ? found[0] : null);
+    let sc = (extractTag(text, tag+'-score').match(/[1-5]/)||[null])[0];
+    let contra = false;
+    if(ok && NONE.test(body)){ contra = true; body = m('found'); if(!sc || +sc < 3) sc = '3'; }
+    else if(!ok && NONE.test(body)) sc = '1';
+    else if(!ok && sc && +sc > 3) sc = '3';
+    const filler = !tip || contra || (ok && wordsIn(tip, srcN) >= 0.6) || /^\s*[–-]\s*$/.test(tip) || FILLER.test(tip);
+    const tipText = !filler ? tip : (!ok && sc && +sc <= 3 ? DT[lang][i] : '');
+    const tipLabel = !filler ? m('tip') : m('tipDef');
     const badge = sc ? `<span class="score score-${sc}">${sc}/5</span>` : '';
-    const filler = !tip || FILLER.test(tip);
-    const tipText = !filler ? tip : (sc && +sc <= 3 ? DEFAULT_TIPS[tag] : '');
-    const tipLabel = !filler ? 'Verbesserung:' : 'Verbesserung (Standardhinweis):';
+    const found = ok ? `<p class="placeholder" style="font-size:0.85rem">${m('src')} «${escapeHtml(beleg)}»</p>` : '';
     const tipHtml = tipText ? `<p style="font-style:italic;color:var(--muted)"><strong style="font-style:normal">${tipLabel}</strong> ${escapeHtml(tipText)}</p>` : '';
-    return `<div class="cat"><h3>${label} ${badge}</h3><p>${escapeHtml(body)}</p>${tipHtml}</div>`;
+    return `<div class="cat"><h3>${AXL[lang][i]} ${badge}</h3><p>${escapeHtml(body)}</p>${found}${tipHtml}</div>`;
   }).join('');
 }
 function cleanGenerated(t){
   return t.replace(/^\s*["«»„“]+|["«»„“]+\s*$/g,'')
     .replace(/^\s*(#{1,6}\s.*|\*\*[^*]+\*\*:?)\s*$/gm,'')
     .replace(/^\s*(?:\d+\.|[-*•])\s+/gm,'')
-    .replace(/^\s*(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit[^:\n]*|Interpretation|Räumlicher Bezug)\s*:\s*/gmi,'')
-    .replace(/(?<=[.!?]\s)(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit[^:\n]{0,25}|Interpretation|Räumlicher Bezug)\s*:\s*/g,'')
+    .replace(/^\s*(Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\s*\/?\s*Quelle|Complétude[^:\n]{0,25}|Completezza[^:\n]{0,25}|Vollständigkeit[^:\n]*|Interpretation|Interprétation|Interpretazione|Référence spatiale|Riferimento spaziale|Räumlicher Bezug)\s*:\s*/gmi,'')
+    .replace(/(?<=[.!?]\s)(Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\s*\/?\s*Quelle|Complétude[^:\n]{0,25}|Completezza[^:\n]{0,25}|Vollständigkeit[^:\n]{0,25}|Interpretation|Interprétation|Interpretazione|Référence spatiale|Riferimento spaziale|Räumlicher Bezug)\s*:\s*/g,'')
     .replace(/\n{3,}/g,'\n\n').trim();
 }
 function renderPlainText(text){
@@ -358,87 +399,134 @@ function renderPlainText(text){
   const paragraphs = text.trim().split(/\n{2,}/).map(p=>`<p>${escapeHtml(p.trim())}</p>`).join('');
   const id = 'gen-' + Date.now();
   return `<div class="cat" id="${id}-src" data-raw="${escapeHtml(text.trim()).replace(/"/g,'&quot;')}">${paragraphs}</div>
-    <button class="secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('${id}-src').dataset.raw); this.textContent='Kopiert!'; setTimeout(()=>this.textContent='In Zwischenablage kopieren',1500)">In Zwischenablage kopieren</button>`;
+    <button class="secondary" type="button" data-d="${m('copied')}" onclick="navigator.clipboard.writeText(document.getElementById('${id}-src').dataset.raw); const c=this.dataset.c, o=this.textContent; this.textContent=this.dataset.d; setTimeout(()=>this.textContent=o,1500)">${m('copy')}</button>`;
 }
 
+let lastSource = '';
+const norm = x => x.toLowerCase().replace(/[«»"„“”'’]/g,'').replace(/\s+/g,' ').trim();
+const NONE = /^\s*(keine?|aucun[e]?|pas de|nessun[ao]?|[–-])(\s|$|[.,:])/i;
+function wordsIn(a, srcN){
+  const w = norm(a).split(/[^\p{L}\p{N}]+/u).filter(x=>x.length>3);
+  return w.length ? w.filter(x=>srcN.includes(x)).length / w.length : 0;
+}
+function supported(b, srcN){ return !!b && b.length > 3 && !NONE.test(b) && (srcN.includes(norm(b)) || wordsIn(b, srcN) >= 0.85); }
+
+const AXL = {
+  de: ['Titel','Zweck','Inhalt','Erhebung / Quelle','Vollständigkeit','Interpretation','Räumlicher Bezug'],
+  fr: ['Titre','But','Contenu','Collecte / Source','Complétude','Interprétation','Référence spatiale'],
+  it: ['Titolo','Scopo','Contenuto','Rilevazione / Fonte','Completezza','Interpretazione','Riferimento spaziale']
+};
+const DT = {
+  de: ['Titel kurz, klar und für Laien verständlich formulieren; Abkürzungen, Gesetzesartikel, Dateinamen und Unterstriche vermeiden.','Beschreiben, wofür die Daten dienen bzw. verwendet werden können.','Erläutern, welche Informationen (Variablen, Umfang) in den Daten enthalten sind.','Angeben, wie und wofür die Daten erhoben wurden und aus welcher Quelle sie stammen.','Angeben, wie vollständig und aktuell die Daten sind und ob es Änderungen in der Erhebung gab.','Beschreiben, welche Rückschlüsse aus den Daten möglich sind und welche nicht.','Falls relevant: Gebiet oder Aggregationsstufe nennen.'],
+  fr: [`Formuler un titre court, clair et compréhensible pour les non-initiés ; éviter abréviations, articles de loi, noms de fichiers.`,`Décrire à quoi servent les données.`,`Expliquer quelles informations (variables, étendue) contiennent les données.`,`Indiquer comment et pourquoi les données ont été collectées et leur source.`,`Indiquer le degré de complétude et d’actualité ainsi que les changements de collecte.`,`Décrire quelles conclusions les données permettent ou non.`,`Si pertinent : indiquer la zone ou le niveau d’agrégation.`],
+  it: [`Formulare un titolo breve, chiaro e comprensibile ai non addetti; evitare abbreviazioni, articoli di legge, nomi di file.`,`Descrivere a cosa servono i dati.`,`Spiegare quali informazioni (variabili, estensione) contengono i dati.`,`Indicare come e perché i dati sono stati rilevati e la loro fonte.`,`Indicare quanto sono completi e attuali i dati e se la rilevazione è cambiata.`,`Descrivere quali conclusioni i dati permettono o meno.`,`Se rilevante: indicare l’area o il livello di aggregazione.`]
+};
+const OPEN = {de:'Der Datensatz enthält', fr:'Le jeu de données contient', it:'Il set di dati contiene'};
+const mkEx = (user, rows) => [{role:'user', content:user}, {role:'assistant', content: rows.map(([k,b,t,tp,sc])=>`<${k}-beleg>${b}</${k}-beleg>\n<${k}>${t}</${k}>\n<${k}-tipp>${tp}</${k}-tipp>\n<${k}-score>${sc}</${k}-score>`).join('\n')}];
+const ANALYZE_EX = {
+  de: mkEx(`Titel: Grundwasserqualität an Messstellen des Kantons Bern\nBeschreibung: Die Daten zeigen Nitrat- und Pestizidwerte an rund 120 Messstellen. Sie werden vom Amt für Wasser und Abfall jährlich im Rahmen der Gewässerschutzverordnung gemessen und im Frühjahr aktualisiert. Die Werte erlauben keine Aussage über die Trinkwasserqualität an einzelnen Haushalten.`, [
+    ['titel','Grundwasserqualität an Messstellen des Kantons Bern','Klar und verständlich, ohne Abkürzungen.','Thema «Nitrat und Pestizide» im Titel ergänzen.','4'],
+    ['zweck','keine','Es wird nicht erklärt, wofür die Daten verwendet werden.','Verwendungszweck nennen, z. B. Überwachung des Gewässerschutzes.','2'],
+    ['inhalt','Nitrat- und Pestizidwerte an rund 120 Messstellen','Messwerte und Umfang sind klar benannt.','Einheiten der Werte angeben.','4'],
+    ['erhebung','vom Amt für Wasser und Abfall jährlich im Rahmen der Gewässerschutzverordnung gemessen','Erhebende Stelle, Rhythmus und Rechtsgrundlage sind genannt.','Messmethode kurz beschreiben.','4'],
+    ['vollstaendigkeit','im Frühjahr aktualisiert','Die Aktualisierung ist genannt, Lücken und Änderungen nicht.','Angeben, ob sich die Messmethode geändert hat.','3'],
+    ['interpretation','erlauben keine Aussage über die Trinkwasserqualität an einzelnen Haushalten','Eine Grenze der Aussagekraft ist benannt.','Weitere Grenzen nennen, z. B. Schwankungen zwischen Jahren.','4'],
+    ['raeumlicherbezug','Messstellen des Kantons Bern','Der Raum ist klar benannt.','Aggregationsstufe nennen, z. B. je Messstelle.','3']]),
+  fr: mkEx(`Titel: Qualité des eaux souterraines aux points de mesure du canton de Berne\nBeschreibung: Les données présentent les teneurs en nitrates et en pesticides à environ 120 points de mesure. Elles sont mesurées chaque année par l’Office de l’eau et des déchets, dans le cadre de l’ordonnance sur la protection des eaux, et mises à jour au printemps. Les valeurs ne permettent aucune conclusion sur la qualité de l’eau potable de ménages individuels.`, [
+    ['titel',`Qualité des eaux souterraines aux points de mesure du canton de Berne`,`Clair et compréhensible, sans abréviations.`,`Ajouter le thème « nitrates et pesticides » dans le titre.`,'4'],
+    ['zweck','aucun',`Il n’est pas indiqué à quoi servent les données.`,`Indiquer l’usage, p. ex. surveillance de la protection des eaux.`,'2'],
+    ['inhalt',`teneurs en nitrates et en pesticides à environ 120 points de mesure`,`Les valeurs mesurées et l’étendue sont clairement nommées.`,`Indiquer les unités des valeurs.`,'4'],
+    ['erhebung',`mesurées chaque année par l’Office de l’eau et des déchets, dans le cadre de l’ordonnance sur la protection des eaux`,`Le service, le rythme et la base légale sont mentionnés.`,`Décrire brièvement la méthode de mesure.`,'4'],
+    ['vollstaendigkeit',`mises à jour au printemps`,`La mise à jour est mentionnée, pas les lacunes ni les changements.`,`Indiquer si la méthode de mesure a changé.`,'3'],
+    ['interpretation',`ne permettent aucune conclusion sur la qualité de l’eau potable de ménages individuels`,`Une limite de la portée des données est mentionnée.`,`Mentionner d’autres limites, p. ex. variations entre années.`,'4'],
+    ['raeumlicherbezug',`points de mesure du canton de Berne`,`L’espace est clairement nommé.`,`Indiquer le niveau d’agrégation, p. ex. par point de mesure.`,'3']]),
+  it: mkEx(`Titel: Qualità delle acque sotterranee nei punti di misura del Cantone di Berna\nBeschreibung: I dati mostrano i valori di nitrati e pesticidi in circa 120 punti di misura. Sono misurati ogni anno dall’Ufficio dell’acqua e dei rifiuti, nell’ambito dell’ordinanza sulla protezione delle acque, e aggiornati in primavera. I valori non permettono conclusioni sulla qualità dell’acqua potabile di singole economie domestiche.`, [
+    ['titel',`Qualità delle acque sotterranee nei punti di misura del Cantone di Berna`,`Chiaro e comprensibile, senza abbreviazioni.`,`Aggiungere il tema «nitrati e pesticidi» nel titolo.`,'4'],
+    ['zweck','nessuno',`Non è spiegato a cosa servano i dati.`,`Indicare l’uso, ad es. sorveglianza della protezione delle acque.`,'2'],
+    ['inhalt',`i valori di nitrati e pesticidi in circa 120 punti di misura`,`I valori misurati e l’estensione sono chiaramente indicati.`,`Indicare le unità dei valori.`,'4'],
+    ['erhebung',`misurati ogni anno dall’Ufficio dell’acqua e dei rifiuti, nell’ambito dell’ordinanza sulla protezione delle acque`,`Servizio, cadenza e base legale sono indicati.`,`Descrivere brevemente il metodo di misura.`,'4'],
+    ['vollstaendigkeit',`aggiornati in primavera`,`L’aggiornamento è indicato, lacune e modifiche no.`,`Indicare se il metodo di misura è cambiato.`,'3'],
+    ['interpretation',`non permettono conclusioni sulla qualità dell’acqua potabile di singole economie domestiche`,`È indicato un limite della validità dei dati.`,`Indicare altri limiti, ad es. variazioni tra gli anni.`,'4'],
+    ['raeumlicherbezug',`punti di misura del Cantone di Berna`,`L’area è chiaramente indicata.`,`Indicare il livello di aggregazione, ad es. per punto di misura.`,'3']])
+};
+const GCLOSE = '\n\nSchreibe daraus jetzt einen zusammenhängenden Fliesstext in ganzen Sätzen. Verwende keine Bezeichnungen wie «Zweck:» und übernimm die Stichworte nicht wörtlich.';
+const GEN_EX = {
+  de: GEN_EX_DE,
+  fr: [{role:'user', content:`Erstelle den Beschreibungstext für folgenden Datensatz:\nTitel: Qualité des eaux souterraines\nZweck: Surveillance de la protection des eaux\nInhalt: Teneurs en nitrates et pesticides, 120 points de mesure\nErhebung/Quelle: Mesures annuelles de l’office cantonal de l’eau\nRäumlicher Bezug: Canton de Berne`+GCLOSE},
+       {role:'assistant', content:`Le jeu de données contient les teneurs en nitrates et en pesticides mesurées à environ 120 points de mesure du canton de Berne. Les données proviennent de mesures effectuées chaque année par l’office cantonal de l’eau et servent à surveiller la protection des eaux.`}],
+  it: [{role:'user', content:`Erstelle den Beschreibungstext für folgenden Datensatz:\nTitel: Qualità delle acque sotterranee\nZweck: Sorveglianza della protezione delle acque\nInhalt: Valori di nitrati e pesticidi, 120 punti di misura\nErhebung/Quelle: Misurazioni annuali dell’ufficio cantonale dell’acqua\nRäumlicher Bezug: Cantone di Berna`+GCLOSE},
+       {role:'assistant', content:`Il set di dati contiene i valori di nitrati e pesticidi misurati in circa 120 punti di misura del Cantone di Berna. I dati provengono da misurazioni effettuate ogni anno dall’ufficio cantonale dell’acqua e servono a sorvegliare la protezione delle acque.`}]
+};
+
 async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}){
-  if(!engine){
-    resultEl.innerHTML = '<p class="placeholder">Bitte zuerst ein Modell laden.</p>';
-    return;
-  }
+  if(!engine){ resultEl.innerHTML = `<p class="placeholder">${m('first')}</p>`; return; }
   btn.disabled = true;
-  resultEl.innerHTML = '<p class="placeholder">Erzeuge Antwort…</p>';
-  const ask = async (prompt, ex) => {
-    const reply = await engine.chat.completions.create({
+  systemPrompt = systemPrompt.replace('immer auf Deutsch', 'immer auf ' + LANG_NAME[lang]).replaceAll('Der Datensatz enthält', OPEN[lang]);
+  const ask = async (prompt, ex, label) => {
+    const t0 = performance.now(); let acc = '', n = 0;
+    const stream = await engine.chat.completions.create({
       messages: [{role:'system', content: systemPrompt}, ...ex, {role:'user', content: prompt}],
-      temperature: 0.4
+      temperature: 0.2, max_tokens: opts.maxTokens || 1000, stream: true,
+      extra_body: {enable_thinking: false}
     });
-    return reply.choices[0].message.content;
+    for await (const ch of stream){
+      acc += ch.choices[0]?.delta?.content || ''; n++;
+      if(n % 6 === 0){
+        const tps = (n / ((performance.now()-t0)/1000)).toFixed(1);
+        resultEl.innerHTML = `<p class="placeholder">${label} ${n} ${m('tokens')} · ${tps} tok/s</p><pre style="white-space:pre-wrap;font-size:0.8rem;color:var(--muted)">${escapeHtml(acc)}</pre>`;
+      }
+    }
+    return acc.replace(/<think>[\s\S]*?<\/think>/g, '');
   };
   try{
-    let text = await ask(userPrompt, examples);
+    resultEl.innerHTML = `<p class="placeholder">${m('working')}</p>`;
+    let text = await ask(userPrompt, examples, m('working'));
     if(opts.isBad && opts.retryPrompt && opts.isBad(text)){
-      resultEl.innerHTML = `<p class="placeholder">${opts.retryMsg||'Ergebnis unbrauchbar – zweiter Versuch…'}</p>`;
-      text = await ask(opts.retryPrompt, opts.retryExamples||[]);
+      text = await ask(opts.retryPrompt, opts.retryExamples||[], opts.retryMsg || m('retry'));
     }
     let html = renderFn(text);
     if(opts.isBad && opts.isBad(text)){
-      html = '<p class="placeholder">Hinweis: Das Modell hat die Vorgaben nur teilweise eingehalten. Ergebnis mit Vorsicht lesen oder ein grösseres Modell wählen.</p>' + html +
-        `<details style="margin-top:12px"><summary class="placeholder">Rohantwort des Modells anzeigen</summary><pre style="white-space:pre-wrap;font-size:0.8rem">${escapeHtml(text)}</pre></details>`;
+      html = `<p class="placeholder">${m('partial')}</p>` + html +
+        `<details style="margin-top:12px"><summary class="placeholder">${m('raw')}</summary><pre style="white-space:pre-wrap;font-size:0.8rem">${escapeHtml(text)}</pre></details>`;
     }
     resultEl.innerHTML = html;
   }catch(err){
-    resultEl.innerHTML = `<p class="placeholder">Fehler: ${escapeHtml(err.message)}</p>`;
+    resultEl.innerHTML = `<p class="placeholder">${m('err')}${escapeHtml(err.message)}</p>`;
   }
   btn.disabled = false;
 }
 
-const FILLER_TIP = /^\s*(keine?|nichts)\b.{0,40}?(änder|verbesser|anpass|ergänz|optimier|erforderlich|nötig|notwendig)/i;
 const ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];
-function analysisIsBad(t){
-  const bodies = ANALYSIS_TAGS.filter(k=>extractTag(t,k)).length;
-  const tips = ANALYSIS_TAGS.filter(k=>extractTag(t,k+'-tipp')).length;
-  const contradictions = ANALYSIS_TAGS.filter(k=>{
-    const sc = +((extractTag(t,k+'-score').match(/[1-5]/)||[0])[0]);
-    return /^\s*keine angabe/i.test(extractTag(t,k)) && sc > 2;
-  }).length;
-  const fillers = ANALYSIS_TAGS.filter(k=>{
-    const sc = +((extractTag(t,k+'-score').match(/[1-5]/)||[0])[0]);
-    return sc >= 1 && sc <= 4 && FILLER_TIP.test(extractTag(t,k+'-tipp'));
-  }).length;
-  return bodies < 6 || tips < 5 || contradictions > 0 || fillers > 0;
-}
+// Nur noch bei wirklich unbrauchbarer (unvollständiger) Antwort ein zweiter Durchlauf
+function analysisIsBad(t){ return ANALYSIS_TAGS.filter(k=>extractTag(t,k)).length < 5; }
 
 analyzeBtn.addEventListener('click', ()=>{
   const title = document.getElementById('analyzeTitle').value.trim();
   const existing = document.getElementById('existing').value.trim();
   if(!existing) return;
   const prompt = `Titel: ${title||'(kein Titel angegeben)'}\nBeschreibung: ${existing}`;
-  const retryPrompt = prompt + '\n\nWICHTIG: Antworte im gleichen XML-Format wie in der Beispielantwort. Schreibe zu JEDEM der sieben Kriterien eine inhaltliche Einschätzung, einen konkreten Verbesserungsvorschlag (Tag mit Zusatz -tipp) und einen Score. Lasse kein Tag leer. Formulierungen wie «Keine Änderungen erforderlich» sind als Tipp nicht erlaubt.';
-  run(prompt, ANALYZE_SYSTEM, analyzeBtn, renderAnalysisXML, ANALYZE_EXAMPLE,
-      {retryPrompt, retryExamples: ANALYZE_EXAMPLE, isBad: analysisIsBad, retryMsg:'Antwort unvollständig – zweiter Versuch…'});
+  lastSource = norm(prompt);
+  const retryPrompt = prompt + '\n\nWICHTIG: Antworte im gleichen XML-Format wie in der Beispielantwort (je Kriterium -beleg, Einschätzung, -tipp, -score). Lasse kein Tag leer.';
+  run(prompt, ANALYZE_SYSTEM, analyzeBtn, renderAnalysisXML, ANALYZE_EX[lang],
+      {retryPrompt, retryExamples: ANALYZE_EX[lang], isBad: analysisIsBad, maxTokens: 1100});
 });
 
 generateBtn.addEventListener('click', ()=>{
-  const title = document.getElementById('title').value.trim();
-  const purpose = document.getElementById('purpose').value.trim();
-  const content = document.getElementById('content').value.trim();
-  const source = document.getElementById('source').value.trim();
-  const completeness = document.getElementById('completeness').value.trim();
-  const interpretation = document.getElementById('interpretation').value.trim();
-  const spatial = document.getElementById('spatial').value.trim();
+  const v = id => document.getElementById(id).value.trim();
+  const title = v('title'), purpose = v('purpose'), content = v('content'), source = v('source'),
+        completeness = v('completeness'), interpretation = v('interpretation'), spatial = v('spatial');
+  const OP = OPEN[lang];
   const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
-  const CLOSE = '\n\nSchreibe daraus jetzt einen zusammenhängenden Fliesstext in ganzen Sätzen. Verwende keine Bezeichnungen wie «Zweck:» und übernimm die Stichworte nicht wörtlich.';
-  const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + CLOSE;
+  const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + GCLOSE + ' Schreibe auf ' + LANG_NAME[lang] + '.';
   const end = t => /[.!?]$/.test(t) ? t : t + '.';
   const prose = [
-    [content,'Was die Daten enthalten'], [purpose,'Wozu sie dienen'], [source,'Woher sie stammen'],
-    [completeness,'Wie vollständig und aktuell sie sind'], [interpretation,'Worauf bei der Deutung zu achten ist'],
-    [spatial,'Auf welches Gebiet sie sich beziehen']
+    [content,'Inhalt'], [purpose,'Zweck'], [source,'Quelle'], [completeness,'Vollständigkeit und Aktualität'],
+    [interpretation,'Interpretation'], [spatial,'Räumlicher Bezug']
   ].filter(x=>x[0]).map(x=>`${x[1]}: ${end(x[0])}`).join(' ');
-  const retryPrompt = `Schreibe eine Beschreibung für den Datensatz «${title||'ohne Titel'}» als Fliesstext in ganzen Sätzen, ohne Listen und ohne Bezeichnungen. Der erste Satz beginnt mit «Der Datensatz enthält». ${prose}`;
-  const isBad = t => (t.match(/(Zweck|Inhalt|Erhebung\s*\/?\s*Quelle|Vollständigkeit|Interpretation|Räumlicher Bezug)\s*:/g)||[]).length >= 2 || /enthält\s*(\.\.\.|…)/.test(t);
-  run(prompt, GENERATE_SYSTEM, generateBtn, renderPlainText, GENERATE_EXAMPLE, {retryPrompt, isBad});
+  const retryPrompt = `Schreibe eine Beschreibung für den Datensatz «${title||'-'}» als Fliesstext in ganzen Sätzen auf ${LANG_NAME[lang]}, ohne Listen und ohne Bezeichnungen. Der erste Satz beginnt mit «${OP}». ${prose}`;
+  const LABELRE = /(Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\s*\/?\s*Quelle|Vollständigkeit|Complétude|Completezza|Interpretation|Interprétation|Interpretazione|Räumlicher Bezug)\s*:/g;
+  const isBad = t => (t.match(LABELRE)||[]).length >= 2 || t.includes(OP + ' …') || t.includes(OP + '...');
+  run(prompt, GENERATE_SYSTEM, generateBtn, renderPlainText, GEN_EX[lang], {retryPrompt, isBad, maxTokens: 700});
 });
 </script>
 </body>
