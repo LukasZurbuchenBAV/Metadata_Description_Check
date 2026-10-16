@@ -1,0 +1,7 @@
+{
+  "name": "metafairy-local",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test", "serve": "python3 -m http.server 8000"},
+  "engines": {"node": ">=22"}
+}
