@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {InferenceClient, generateResponse} from '../src/inference.js';
 
-const source = ['config', 'i18n', 'prompts', 'validation', 'render', 'app'].map(name=>readFileSync(new URL(`../src/${name}.js`, import.meta.url), 'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'')).join('\n');
+const source = ['config', 'i18n', 'validation', 'prompts', 'render', 'app'].map(name=>readFileSync(new URL(`../src/${name}.js`, import.meta.url), 'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'')).join('\n');
 function app(){
   const elements=new Map();
   const get=id=>{
@@ -56,4 +56,19 @@ test('cancellation suppresses output and releases busy state',async()=>{
   await a.eval('request');
   assert.equal(a.get('result').textContent,'Abgebrochen.');
   assert.equal(a.eval('busy'),false);
+});
+
+test('analysis retries with corrective instructions and preserves constrained decoding mode',async()=>{
+  const a=app();
+  const sample=JSON.parse(readFileSync(new URL('./fixtures/analysis-placeholder.json',import.meta.url)));
+  a.eval(`globalThis.sample=${JSON.stringify(sample)};globalThis.requests=[];modelReady=true;
+    const valid=ANALYSIS_TAGS.map(tag=>'<'+tag+'>Einschätzung.</'+tag+'><'+tag+'-beleg>none</'+tag+'-beleg><'+tag+'-tipp>Prüfen.</'+tag+'-tipp><'+tag+'-score>2</'+tag+'-score>').join('');
+    engine={ready:true,generate:async(messages,maxTokens,onProgress,mode)=>{requests.push({messages,mode});return {text:requests.length===1?sample.raw:valid,cut:false};}};
+    globalThis.request=run(analysisPrompt(sample.source),ANALYZE_SYSTEM,text=>renderAnalysisXML(text,sample.source,'de'),{isBad:text=>analysisIsBad(text,sample.source),maxTokens:1700,mode:'analysis',retrySystem:ANALYZE_RETRY_SYSTEM});`);
+  await a.eval('request');
+  assert.equal(a.eval('requests.length'),2);
+  assert.equal(a.eval(`requests.every(request=>request.mode==='analysis')`),true);
+  assert.notEqual(a.eval('requests[0].messages[0].content'),a.eval('requests[1].messages[0].content'));
+  assert.equal(a.eval('requests[0].messages[1].content'),a.eval('requests[1].messages[1].content'));
+  assert.match(a.get('result').innerHTML,/Einschätzung/);
 });

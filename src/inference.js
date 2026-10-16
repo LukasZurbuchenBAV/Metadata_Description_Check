@@ -23,9 +23,9 @@ export class InferenceClient {
     this.ready = true;
   }
 
-  generate(messages, maxTokens, onProgress){
+  generate(messages, maxTokens, onProgress, mode='text'){
     if(!this.ready) return Promise.reject(new Error('MODEL_NOT_READY'));
-    return this.request('generate', {messages, maxTokens}, onProgress);
+    return this.request('generate', {messages, maxTokens, mode}, onProgress);
   }
 
   request(type, payload, onProgress){
@@ -87,6 +87,6 @@ export class InferenceClient {
   unload(){ this.dispose(); }
 }
 
-export function generateResponse(engine, messages, maxTokens, onProgress){
-  return engine.generate(messages, maxTokens, onProgress);
+export function generateResponse(engine, messages, maxTokens, onProgress, mode){
+  return engine.generate(messages, maxTokens, onProgress, mode);
 }

@@ -80,3 +80,12 @@ test('old worker errors cannot terminate a replacement worker',async()=>{
   assert.equal(client.ready,true);
   client.unload();
 });
+
+test('analysis decoding mode survives the client-to-worker boundary',async()=>{
+  const {worker,client}=await loaded();
+  const request=client.generate([],1700,undefined,'analysis');
+  assert.equal(worker.messages.at(-1).mode,'analysis');
+  worker.reply('done',{text:'analysis',cut:false});
+  await request;
+  client.unload();
+});

@@ -1,6 +1,6 @@
 import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS} from './config.js';
 import {message, LI, UI, PH, TITLES} from './i18n.js';
-import {ANALYZE_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from './prompts.js';
+import {ANALYZE_SYSTEM, ANALYZE_RETRY_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from './prompts.js';
 import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
 import {renderAnalysisXML, renderPlainText, attachCopy, escapeHtml} from './render.js';
 import {InferenceClient, generateResponse} from './inference.js';
@@ -132,21 +132,21 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
   updateControls();
   const started = performance.now();
   systemPrompt = localizedSystem(systemPrompt, requestLang);
-  const ask = async prompt => {
-    const messages = [{role:'system', content:systemPrompt}, {role:'user', content:prompt}];
+  const ask = async (prompt, instructions=systemPrompt) => {
+    const messages = [{role:'system', content:instructions}, {role:'user', content:prompt}];
     checkBudget(messages, opts.maxTokens);
     return generateResponse(engine, messages, opts.maxTokens, acc=>{
       resultEl.innerHTML = `<p class="placeholder">${m('working')}</p><pre class="stream">${escapeHtml(acc)}</pre>`;
-    });
+    }, opts.mode);
   };
   try{
     document.getElementById('resultStatus').textContent = m('working');
     resultEl.textContent = m('working');
     let response = await ask(userPrompt);
     if(!cancelled && !response.cut && opts.isBad(response.text)){
-      // Use the same instructions and input; retry only format/validation failures.
+      // Use corrective instructions, keeping the original input and evidence checks.
       resultEl.textContent = m('retry');
-      response = await ask(userPrompt);
+      response = await ask(userPrompt, opts.retrySystem ? localizedSystem(opts.retrySystem, requestLang) : systemPrompt);
     }
     if(cancelled){ resultEl.textContent = m('cancelled'); return; }
     const invalid = opts.isBad(response.text);
@@ -180,7 +180,7 @@ analyzeBtn.addEventListener('click', ()=>{
   const requestLang = lang;
 
   run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, requestLang),
-      {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS});
+      {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS, mode:'analysis', retrySystem:ANALYZE_RETRY_SYSTEM});
 });
 
 generateBtn.addEventListener('click', ()=>{
