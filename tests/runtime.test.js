@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8').m
 function app(){
   const elements=new Map();
   const get=id=>{
-    if(!elements.has(id)) elements.set(id,{style:{},dataset:{},value:'',disabled:false,hidden:false,textContent:'',innerHTML:'',addEventListener(name,fn){this[name]=fn;},append(){}});
+    if(!elements.has(id)) elements.set(id,{style:{},dataset:{},value:'',disabled:false,hidden:false,textContent:'',innerHTML:'',addEventListener(name,fn){this[name]=fn;},setAttribute(){},append(){}});
     return elements.get(id);
   };
   const context=vm.createContext({performance,TextEncoder,navigator:{},NodeFilter:{SHOW_TEXT:4},document:{getElementById:get,documentElement:{},createTreeWalker(){return {nextNode:()=>null};},querySelectorAll:()=>[],createElement:()=>({addEventListener(){},append(){}})}});

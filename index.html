@@ -33,7 +33,12 @@
   .progressbar{height:100%;width:0%;background:var(--red);transition:width .2s}
   .status{font-size:0.85rem;color:var(--muted);margin-top:8px}
   .tabs{display:flex;gap:0;border-bottom:2px solid var(--ink);margin-bottom:0}
-  .tab{padding:10px 18px;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:3px solid transparent}
+  .tab{background:transparent;border:0;border-radius:0;font-size:0.95rem;padding:10px 18px;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:3px solid transparent}
+  .tab:hover:not(:disabled){background:var(--paper);color:var(--ink)}
+  :focus-visible{outline:3px solid #005fcc;outline-offset:3px}
+  [hidden]{display:none!important}
+  .stream{white-space:pre-wrap;overflow-wrap:anywhere;font-size:0.85rem}
+  .notice{border:1px solid var(--line);background:#fff8e1;padding:8px 12px;font-size:0.85rem}
   .tab.active{color:var(--ink);border-bottom-color:var(--red)}
   .tabpanel{display:none;padding-top:18px}
   .tabpanel.active{display:block}
@@ -64,7 +69,7 @@
 <header>
   <div>
     <h1>Meta<span>Fairy</span></h1>
-    <div class="sub">Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die KI läuft komplett lokal im Browser, keine Daten verlassen dein Gerät.</div>
+    <div class="sub">Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die Eingaben werden lokal im Browser verarbeitet. Für Software und Modell-Downloads werden externe Dienste kontaktiert.</div>
     <select id="lang" aria-label="Sprache / Langue / Lingua"><option value="de">Deutsch</option><option value="fr">Français</option><option value="it">Italiano</option></select>
   </div>
 </header>
@@ -72,19 +77,19 @@
 <main>
   <div class="panel">
     <div class="modelrow">
-      <button id="loadBtn">Modell laden (Llama-3.2-3B-Instruct, ca. 2.2 GB)</button>
+      <button id="loadBtn">Modell laden (Qwen3-4B, ca. 2.5 GB)</button>
     </div>
-    <div class="progresswrap" id="progresswrap"><div class="progressbar" id="progressbar"></div></div>
-    <div class="status" id="status">Modell muss beim ersten Mal heruntergeladen werden (ca. 2.2 GB). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).</div>
+    <div class="progresswrap" id="progresswrap" role="progressbar" aria-label="Modell / Modèle / Modello" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progressbar" id="progressbar"></div></div>
+    <div class="status" id="status" role="status" aria-live="polite">Qwen3-4B: ca. 2.5 GB Download, ca. 3.4 GB GPU-Speicher. WebGPU mit shader-f16 erforderlich. Modell wird erst auf Knopfdruck geladen.</div>
   </div>
 
   <div class="panel">
-    <div class="tabs">
-      <div class="tab active" data-tab="analyze">Beschreibung analysieren</div>
-      <div class="tab" data-tab="generate">Beschreibung generieren</div>
+    <div class="tabs" role="tablist" aria-label="Aufgabe / Tâche / Attività">
+      <button type="button" class="tab active" id="analyzeTab" role="tab" aria-selected="true" aria-controls="tab-analyze" data-tab="analyze">Beschreibung analysieren</button>
+      <button type="button" class="tab" id="generateTab" role="tab" aria-selected="false" aria-controls="tab-generate" tabindex="-1" data-tab="generate">Beschreibung generieren</button>
     </div>
 
-    <div class="tabpanel active" id="tab-analyze">
+    <div class="tabpanel active" id="tab-analyze" role="tabpanel" aria-labelledby="analyzeTab">
       <label for="analyzeTitle">Titel des Datensatzes</label>
       <input type="text" id="analyzeTitle" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
       <label for="existing">Bestehende Beschreibung</label>
@@ -94,7 +99,7 @@
       </div>
     </div>
 
-    <div class="tabpanel" id="tab-generate">
+    <div class="tabpanel" id="tab-generate" role="tabpanel" aria-labelledby="generateTab" hidden>
       <label for="title">Titel des Datensatzes</label>
       <input type="text" id="title" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
       <div class="grid2">
@@ -129,7 +134,8 @@
     </div>
 
     <button id="cancelBtn" class="secondary" hidden>Abbrechen</button>
-    <div class="result" id="result"></div>
+    <p id="resultStatus" class="status" role="status" aria-live="polite"></p>
+    <div class="result" id="result" aria-busy="false"></div>
   </div>
 </main>
 
@@ -137,6 +143,8 @@
   Läuft vollständig client-seitig über <a href="https://github.com/mlc-ai/web-llm" target="_blank">WebLLM</a>. Keine API-Keys, keine Server-Kosten. Nach dem Vorbild von
   <a href="https://github.com/machinelearningZH/ogd_ai-metafairy" target="_blank">machinelearningZH/ogd_ai-metafairy</a> (MIT-Lizenz).
 </footer>
+
+<noscript><p>Bitte JavaScript aktivieren. / Veuillez activer JavaScript. / Attiva JavaScript.</p></noscript>
 
 <script type="module">
 // Load the inference dependency on demand so failures can be reported in the UI.
@@ -160,9 +168,9 @@ const LANG_NAME = {de:'Deutsch', fr:'Französisch', it:'Italienisch'};
 const S = MODEL_SIZE_LABEL;
 const MSG = {
   loadBtn: [`Modell laden (${MODEL_NAME}, ${S})`, `Charger le modèle (${MODEL_NAME}, ${S})`, `Carica il modello (${MODEL_NAME}, ${S})`],
-  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt einen Browser mit WebGPU (aktuelles Chrome oder Edge).`,
-         `Le modèle doit être téléchargé la première fois (${S}). Nécessite un navigateur avec WebGPU (Chrome ou Edge récent).`,
-         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede un browser con WebGPU (Chrome o Edge aggiornato).`],
+  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt WebGPU mit shader-f16 und ca. 3.4 GB GPU-Speicher; bei Speichermangel kann das Laden trotzdem scheitern.`,
+         `Le modèle doit être téléchargé la première fois (${S}). Nécessite WebGPU avec shader-f16 et environ 3.4 Go de mémoire GPU ; le chargement peut échouer si la mémoire manque.`,
+         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede WebGPU con shader-f16 e circa 3.4 GB di memoria GPU; il caricamento può fallire se la memoria è insufficiente.`],
   loading: [`Lade Modell ${MODEL_NAME} (${S}, nur beim ersten Mal)…`, `Chargement du modèle ${MODEL_NAME} (${S}, seulement la première fois)…`, `Caricamento del modello ${MODEL_NAME} (${S}, solo la prima volta)…`],
   ready: ['Modell geladen. Bereit.', 'Modèle chargé. Prêt.', 'Modello caricato. Pronto.'],
   loadErr: ['Fehler beim Laden: ', 'Erreur de chargement : ', 'Errore di caricamento: '],
@@ -190,6 +198,7 @@ const MSG = {
          'Nota: questo risultato proviene da una piccola IA che gira localmente nel browser. Può sbagliare, trascurare informazioni o valutare in modo troppo severo o troppo indulgente e non dà sempre lo stesso risultato. Da intendere come suggerimento, da verificare personalmente.'],
   unavailable: ['Kriterium unvollständig – keine Bewertung verfügbar.', 'Critère incomplet – évaluation indisponible.', 'Criterio incompleto – valutazione non disponibile.'],
   unverified: ['Fundstelle nicht verifiziert; Bewertung des Modells ungeprüft.', 'Passage non vérifié ; évaluation du modèle non vérifiée.', 'Passaggio non verificato; valutazione del modello non verificata.'],
+  finished: ['Bearbeitung beendet. Ergebnis unten prüfen.', 'Traitement terminé. Vérifiez le résultat ci-dessous.', 'Elaborazione terminata. Controlla il risultato qui sotto.'],
   empty: ['Bitte eine Beschreibung bzw. mindestens ein inhaltliches Feld ausfüllen.', 'Veuillez saisir une description ou au moins un champ de contenu.', 'Inserisci una descrizione o almeno un campo di contenuto.'],
   budget: ['Eingabe zu lang für das 4096-Token-Kontextfenster (konservative UTF-8-Obergrenze inklusive Antwortreserve). Bitte Text kürzen.', 'Texte trop long pour le contexte de 4096 tokens (borne UTF-8 prudente, réponse réservée). Veuillez raccourcir le texte.', 'Testo troppo lungo per il contesto di 4096 token (limite UTF-8 prudente con spazio per la risposta). Accorcia il testo.'],
   cancelled: ['Abgebrochen.', 'Annulé.', 'Annullato.'],
@@ -200,7 +209,7 @@ const MSG = {
 const m = k => MSG[k][LI[lang]];
 
 const UI = {
-  'Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die KI läuft komplett lokal im Browser, keine Daten verlassen dein Gerät.': ['Vérifier et rédiger des descriptions de jeux de données OGD – l’IA tourne entièrement dans le navigateur, aucune donnée ne quitte votre appareil.', 'Verificare e redigere descrizioni di set di dati OGD – l’IA gira interamente nel browser, nessun dato lascia il tuo dispositivo.'],
+  'Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die Eingaben werden lokal im Browser verarbeitet. Für Software und Modell-Downloads werden externe Dienste kontaktiert.': ['Vérifier et rédiger des descriptions OGD – les saisies sont traitées localement dans le navigateur. Des services externes sont contactés pour télécharger le logiciel et le modèle.', 'Verificare e redigere descrizioni OGD – i dati inseriti sono elaborati localmente nel browser. Servizi esterni vengono contattati per scaricare software e modello.'],
   'Beschreibung analysieren': ['Analyser la description', 'Analizza la descrizione'],
   'Beschreibung generieren': ['Générer la description', 'Genera la descrizione'],
   'Titel des Datensatzes': ['Titre du jeu de données', 'Titolo del set di dati'],
@@ -233,7 +242,7 @@ function applyLang(){
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while((n = walker.nextNode())){
-    if(n.parentElement.closest('script,style,option,#loadBtn,#status')) continue;
+    if(n.parentElement.closest('script,style,option,#loadBtn,#status,#result,#resultStatus')) continue;
     if(!origText.has(n)) origText.set(n, n.nodeValue);
     const orig = origText.get(n), core = orig.trim();
     if(UI[core]) n.nodeValue = orig.replace(core, L === 0 ? core : UI[core][L-1]);
@@ -252,12 +261,24 @@ function setLang(l){ lang = l; langSel.value = l; applyLang(); }
 langSel.addEventListener('change', e=> setLang(e.target.value));
 const TITLES = ['MetaFairy – Datensatzbeschreibungen lokal mit KI','MetaFairy – descriptions de jeux de données, en local avec l’IA','MetaFairy – descrizioni di set di dati, in locale con l’IA'];
 
-document.querySelectorAll('.tab').forEach(tab=>{
-  tab.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function activateTab(tab){
+  tabs.forEach(item=>{
+    const active = item === tab;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+    item.tabIndex = active ? 0 : -1;
+    const panel = document.getElementById('tab-' + item.dataset.tab);
+    panel.classList.toggle('active', active);
+    panel.hidden = !active;
+  });
+}
+tabs.forEach((tab,index)=>{
+  tab.addEventListener('click', ()=>activateTab(tab));
+  tab.addEventListener('keydown', event=>{
+    const next = {ArrowRight:(index+1)%tabs.length, ArrowLeft:(index+tabs.length-1)%tabs.length, Home:0, End:tabs.length-1}[event.key];
+    if(next === undefined) return;
+    event.preventDefault(); activateTab(tabs[next]); tabs[next].focus();
   });
 });
 
@@ -283,6 +304,7 @@ function updateControls(){
   analyzeBtn.disabled = generateBtn.disabled = busy || loading || !modelReady;
   langSel.disabled = busy || loading;
   document.getElementById('cancelBtn').hidden = !busy;
+  resultEl.setAttribute('aria-busy', String(busy));
 }
 document.getElementById('cancelBtn').addEventListener('click', ()=>{
   cancelled = true;
@@ -301,7 +323,9 @@ loadBtn.addEventListener('click', async ()=>{
     const webllm = await import('https://esm.run/@mlc-ai/web-llm@0.2.80');
     engine = new webllm.MLCEngine();
     engine.setInitProgressCallback(p=>{
-      progressbar.style.width = Math.round((p.progress||0)*100)+'%';
+      const percent = Math.max(0, Math.min(100, Math.round((p.progress||0)*100)));
+      progressbar.style.width = percent+'%';
+      progresswrap.setAttribute('aria-valuenow', String(percent));
       status.textContent = p.text || m('loading');
     });
     await engine.reload(MODEL_ID);
@@ -502,6 +526,7 @@ async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}
     return {text:acc.replace(/<think>[\s\S]*?<\/think>/g,''), cut};
   };
   try{
+    document.getElementById('resultStatus').textContent = m('working');
     resultEl.textContent = m('working');
     let response = await ask(userPrompt);
     if(!cancelled && !response.cut && opts.isBad(response.text)){
@@ -523,7 +548,10 @@ async function run(userPrompt, systemPrompt, btn, renderFn, examples=[], opts={}
     }
     if(opts.generated && !invalid && !response.cut) attachCopy(response.text);
   }catch(err){ resultEl.textContent = m('err') + err.message; }
-  finally{ busy = false; updateControls(); }
+  finally{
+    busy = false; updateControls();
+    document.getElementById('resultStatus').textContent = cancelled ? m('cancelled') : m('finished');
+  }
 }
 
 const ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];
