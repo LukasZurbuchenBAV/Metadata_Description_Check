@@ -54,7 +54,7 @@ class CDP {
 test('static app loads, supports keyboard tabs and recovers from inference failures', {skip:!executable,timeout:40_000}, async t=>{
   const server=createServer(async (request,response)=>{
     try{
-      const pathname=decodeURIComponent(new URL(request.url,'http://localhost').pathname);
+      const pathname=decodeURIComponent(new URL(request.url,'http://localhost').pathname).replace(/^\/preview(?=\/)/,'');
       const path=resolve(root,'.'+(pathname==='/' ? '/index.html' : pathname));
       if(!path.startsWith(root+sep)) throw new Error('outside root');
       const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json'};
@@ -65,7 +65,7 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const profile=await mkdtemp(resolve(tmpdir(),'metafairy-browser-'));
-  const chrome=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore'});
+  const chrome=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',...(process.env.CI ? ['--no-sandbox'] : []),`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore'});
   const cdp=new CDP();
   t.after(async()=>{
     cdp.socket?.close();
@@ -103,7 +103,7 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
       terminate(){clearTimeout(this.timer);}
     };
   `});
-  const url=`http://127.0.0.1:${server.address().port}/`;
+  const url=`http://127.0.0.1:${server.address().port}/preview/`;
   await cdp.send('Page.navigate',{url});
   await cdp.until(`document.getElementById('loadBtn') && !document.getElementById('loadBtn').disabled`);
   assert.equal(requests.some(url=>/^https?:/.test(url)&&!url.startsWith(`http://127.0.0.1:${server.address().port}/`)),false,'no external downloads on page load');
@@ -131,6 +131,20 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
   await cdp.evaluate(`window.__cut=false;window.__mode='stall';document.getElementById('generateBtn').click();document.getElementById('cancelBtn').click()`);
   await cdp.until(`!document.getElementById('generateBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.getElementById('result').textContent`),'Abgebrochen.');
+  await cdp.evaluate(`
+    window.__mode='ok';
+    window.__response=['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'].map(tag=>
+      '<'+tag+'>Teilweise &lt;test&gt;.</'+tag+'><'+tag+'-beleg>'+(tag==='titel'?'Test':tag==='vollstaendigkeit'?'jährlich aktualisiert':'none')+'</'+tag+'-beleg><'+tag+'-tipp>Abdeckung ergänzen.</'+tag+'-tipp><'+tag+'-score>2</'+tag+'-score>'
+    ).join('');
+    document.getElementById('analyzeTab').click();
+    document.getElementById('analyzeTitle').value='Test';
+    document.getElementById('existing').value='Die Daten werden jährlich aktualisiert.';
+    document.getElementById('analyzeBtn').click();
+    document.getElementById('existing').value='Ein anderer Text.';
+  `);
+  await cdp.until(`!document.getElementById('analyzeBtn').disabled`);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].querySelector('.score').textContent`),'2/5');
+  assert.match(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].textContent`),/jährlich aktualisiert/,'evidence uses the submitted source snapshot');
   await cdp.evaluate(`window.__mode='error';document.getElementById('loadBtn').click()`);
   await cdp.until(`!document.getElementById('loadBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.getElementById('generateBtn').disabled`),true);

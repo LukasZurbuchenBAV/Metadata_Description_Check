@@ -1,0 +1,131 @@
+[
+  {
+    "id": "de-complete",
+    "lang": "de",
+    "title": "Grundwasserqualität im Kanton Bern",
+    "description": "Die Daten enthalten Nitratwerte an 120 Messstellen im Kanton Bern. Das kantonale Wasseramt misst jährlich zur Überwachung des Gewässerschutzes. Die Daten sind bis 2025 vollständig und werden im Frühjahr aktualisiert. Keine Aussage über die Trinkwasserqualität einzelner Haushalte ist möglich.",
+    "expectedEvidence": {
+      "titel": "Grundwasserqualität im Kanton Bern",
+      "zweck": "zur Überwachung des Gewässerschutzes",
+      "inhalt": "Nitratwerte an 120 Messstellen",
+      "erhebung": "Das kantonale Wasseramt misst jährlich",
+      "vollstaendigkeit": "bis 2025 vollständig",
+      "interpretation": "Keine Aussage über die Trinkwasserqualität einzelner Haushalte ist möglich.",
+      "raeumlicherbezug": "im Kanton Bern"
+    },
+    "generation": {
+      "title": "Grundwasserqualität im Kanton Bern",
+      "purpose": "zur Überwachung des Gewässerschutzes",
+      "content": "Nitratwerte an 120 Messstellen",
+      "source": "Das kantonale Wasseramt misst jährlich",
+      "completeness": "bis 2025 vollständig",
+      "interpretation": "Keine Aussage über die Trinkwasserqualität einzelner Haushalte ist möglich.",
+      "spatial": "im Kanton Bern"
+    }
+  },
+  {
+    "id": "de-sparse",
+    "lang": "de",
+    "title": "Messwerte",
+    "description": "Der Datensatz enthält Nitratwerte.",
+    "expectedEvidence": {
+      "titel": "Messwerte",
+      "zweck": null,
+      "inhalt": "Nitratwerte",
+      "erhebung": null,
+      "vollstaendigkeit": null,
+      "interpretation": null,
+      "raeumlicherbezug": null
+    },
+    "generation": {
+      "title": "Messwerte",
+      "content": "Nitratwerte"
+    }
+  },
+  {
+    "id": "fr-complete",
+    "lang": "fr",
+    "title": "Qualité des eaux souterraines du canton de Berne",
+    "description": "Les données contiennent les teneurs en nitrates de 120 points de mesure du canton de Berne. Le service cantonal des eaux mesure chaque année pour surveiller la protection des eaux. Les données sont complètes jusqu’en 2025 et actualisées au printemps. Pas de conclusion possible sur l’eau potable des ménages.",
+    "expectedEvidence": {
+      "titel": "Qualité des eaux souterraines du canton de Berne",
+      "zweck": "pour surveiller la protection des eaux",
+      "inhalt": "teneurs en nitrates de 120 points de mesure",
+      "erhebung": "Le service cantonal des eaux mesure chaque année",
+      "vollstaendigkeit": "complètes jusqu’en 2025",
+      "interpretation": "Pas de conclusion possible sur l’eau potable des ménages.",
+      "raeumlicherbezug": "du canton de Berne"
+    },
+    "generation": {
+      "title": "Qualité des eaux souterraines du canton de Berne",
+      "purpose": "pour surveiller la protection des eaux",
+      "content": "teneurs en nitrates de 120 points de mesure",
+      "source": "Le service cantonal des eaux mesure chaque année",
+      "completeness": "complètes jusqu’en 2025",
+      "interpretation": "Pas de conclusion possible sur l’eau potable des ménages.",
+      "spatial": "du canton de Berne"
+    }
+  },
+  {
+    "id": "fr-sparse",
+    "lang": "fr",
+    "title": "Mesures",
+    "description": "Le jeu de données contient des teneurs en nitrates.",
+    "expectedEvidence": {
+      "titel": "Mesures",
+      "zweck": null,
+      "inhalt": "teneurs en nitrates",
+      "erhebung": null,
+      "vollstaendigkeit": null,
+      "interpretation": null,
+      "raeumlicherbezug": null
+    },
+    "generation": {
+      "title": "Mesures",
+      "content": "teneurs en nitrates"
+    }
+  },
+  {
+    "id": "it-complete",
+    "lang": "it",
+    "title": "Qualità delle acque sotterranee del Cantone di Berna",
+    "description": "I dati contengono i valori di nitrati di 120 punti di misura del Cantone di Berna. Il servizio cantonale delle acque misura ogni anno per sorvegliare la protezione delle acque. I dati sono completi fino al 2025 e aggiornati in primavera. Nessuna conclusione possibile sull’acqua potabile delle economie domestiche.",
+    "expectedEvidence": {
+      "titel": "Qualità delle acque sotterranee del Cantone di Berna",
+      "zweck": "per sorvegliare la protezione delle acque",
+      "inhalt": "valori di nitrati di 120 punti di misura",
+      "erhebung": "Il servizio cantonale delle acque misura ogni anno",
+      "vollstaendigkeit": "completi fino al 2025",
+      "interpretation": "Nessuna conclusione possibile sull’acqua potabile delle economie domestiche.",
+      "raeumlicherbezug": "del Cantone di Berna"
+    },
+    "generation": {
+      "title": "Qualità delle acque sotterranee del Cantone di Berna",
+      "purpose": "per sorvegliare la protezione delle acque",
+      "content": "valori di nitrati di 120 punti di misura",
+      "source": "Il servizio cantonale delle acque misura ogni anno",
+      "completeness": "completi fino al 2025",
+      "interpretation": "Nessuna conclusione possibile sull’acqua potabile delle economie domestiche.",
+      "spatial": "del Cantone di Berna"
+    }
+  },
+  {
+    "id": "it-sparse",
+    "lang": "it",
+    "title": "Misure",
+    "description": "Il set di dati contiene i valori di nitrati.",
+    "expectedEvidence": {
+      "titel": "Misure",
+      "zweck": null,
+      "inhalt": "valori di nitrati",
+      "erhebung": null,
+      "vollstaendigkeit": null,
+      "interpretation": null,
+      "raeumlicherbezug": null
+    },
+    "generation": {
+      "title": "Misure",
+      "content": "valori di nitrati"
+    }
+  }
+]

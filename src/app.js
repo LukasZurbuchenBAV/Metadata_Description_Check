@@ -1,6 +1,6 @@
 import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS} from './config.js';
-import {message, LI, LANG_NAME, UI, PH, TITLES, OPEN} from './i18n.js';
-import {ANALYZE_SYSTEM, GENERATE_SYSTEM, GCLOSE} from './prompts.js';
+import {message, LI, UI, PH, TITLES} from './i18n.js';
+import {ANALYZE_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from './prompts.js';
 import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
 import {renderAnalysisXML, renderPlainText, attachCopy, escapeHtml} from './render.js';
 import {InferenceClient, generateResponse} from './inference.js';
@@ -131,7 +131,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
   busy = true; cancelled = false;
   updateControls();
   const started = performance.now();
-  systemPrompt = systemPrompt.replace('always in German', 'always in ' + LANG_NAME[requestLang]).replaceAll('Der Datensatz enthält', OPEN[requestLang]);
+  systemPrompt = localizedSystem(systemPrompt, requestLang);
   const ask = async prompt => {
     const messages = [{role:'system', content:systemPrompt}, {role:'user', content:prompt}];
     checkBudget(messages, opts.maxTokens);
@@ -175,7 +175,7 @@ analyzeBtn.addEventListener('click', ()=>{
   const existing = document.getElementById('existing').value.trim();
   if(busy || loading) return;
   if(!existing){ resultEl.textContent = m('empty'); return; }
-  const prompt = `Titel: ${title||'(kein Titel angegeben)'}\nBeschreibung: ${existing}`;
+  const prompt = analysisPrompt({title, description:existing});
   const source = {title, description:existing};
   const requestLang = lang;
 
@@ -189,7 +189,6 @@ generateBtn.addEventListener('click', ()=>{
         completeness = v('completeness'), interpretation = v('interpretation'), spatial = v('spatial');
   if(busy || loading) return;
   if(![purpose,content,source,completeness,interpretation,spatial].some(Boolean)){ resultEl.textContent = m('empty'); return; }
-  const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
-  const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + GCLOSE + ' Schreibe auf ' + LANG_NAME[lang] + '.';
+  const prompt = generationPrompt({title,purpose,content,source,completeness,interpretation,spatial}, lang);
   run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:GENERATION_MAX_TOKENS});
 });
