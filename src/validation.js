@@ -1,3 +1,5 @@
+import {CONTEXT_WINDOW_SIZE, CHAT_TEMPLATE_RESERVE} from './config.js';
+
 export function parseAnalysis(text, source){
   return ANALYSIS_TAGS.map(tag=>{
     const fields = ['', '-beleg', '-tipp', '-score'].map(suffix=>{
@@ -27,7 +29,7 @@ export function checkBudget(messages, maxTokens){
   // Qwen3 uses a byte-level tokenizer: UTF-8 bytes conservatively bound text tokens.
   // Reserve 256 tokens for chat-template markers and 1700/700 for the answer.
   const bytes = messages.reduce((n,message)=>n + new TextEncoder().encode(message.content).length,0);
-  if(bytes + 256 + maxTokens > 4096) throw new Error('INPUT_TOO_LONG');
+  if(bytes + CHAT_TEMPLATE_RESERVE + maxTokens > CONTEXT_WINDOW_SIZE) throw new Error('INPUT_TOO_LONG');
   return bytes;
 }
 

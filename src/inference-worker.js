@@ -1,4 +1,4 @@
-import {MODEL_ID} from './config.js';
+import {MODEL_ID, WEBLLM_URL} from './config.js';
 import {checkBudget} from './validation.js';
 
 let engine = null, active = null;
@@ -17,7 +17,7 @@ self.onmessage = async ({data:message})=>{
     let value;
     if(message.type === 'load'){
       // Import errors are returned through the same protocol as model-load failures.
-      const {MLCEngine} = await import('https://esm.run/@mlc-ai/web-llm@0.2.80');
+      const {MLCEngine} = await import(WEBLLM_URL);
       engine = new MLCEngine();
       engine.setInitProgressCallback(progress=>send(job.id,'progress',progress));
       await engine.reload(MODEL_ID);

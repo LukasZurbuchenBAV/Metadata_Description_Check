@@ -1,3 +1,4 @@
+import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS} from './config.js';
 import {message, LI, LANG_NAME, UI, PH, TITLES, OPEN} from './i18n.js';
 import {ANALYZE_SYSTEM, GENERATE_SYSTEM, GCLOSE} from './prompts.js';
 import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
@@ -179,7 +180,7 @@ analyzeBtn.addEventListener('click', ()=>{
   const requestLang = lang;
 
   run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, requestLang),
-      {isBad:text=>analysisIsBad(text, source), maxTokens:1700});
+      {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS});
 });
 
 generateBtn.addEventListener('click', ()=>{
@@ -190,5 +191,5 @@ generateBtn.addEventListener('click', ()=>{
   if(![purpose,content,source,completeness,interpretation,spatial].some(Boolean)){ resultEl.textContent = m('empty'); return; }
   const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
   const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + GCLOSE + ' Schreibe auf ' + LANG_NAME[lang] + '.';
-  run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:700});
+  run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:GENERATION_MAX_TOKENS});
 });
