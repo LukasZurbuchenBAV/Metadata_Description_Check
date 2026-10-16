@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MetaFairy – Datensatzbeschreibungen lokal mit KI</title>
+<!-- APP_STYLES -->
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Meta<span>Fairy</span></h1>
+    <div class="sub">Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die Eingaben werden lokal im Browser verarbeitet. Für Software und Modell-Downloads werden externe Dienste kontaktiert.</div>
+    <select id="lang" aria-label="Sprache / Langue / Lingua"><option value="de">Deutsch</option><option value="fr">Français</option><option value="it">Italiano</option></select>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="modelrow">
+      <button id="loadBtn">Modell laden (Qwen3-4B, ca. 2.5 GB)</button>
+    </div>
+    <div class="progresswrap" id="progresswrap" role="progressbar" aria-label="Modell / Modèle / Modello" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progressbar" id="progressbar"></div></div>
+    <div class="status" id="status" role="status" aria-live="polite">Qwen3-4B: ca. 2.5 GB Download, ca. 3.4 GB GPU-Speicher. WebGPU mit shader-f16 erforderlich. Modell wird erst auf Knopfdruck geladen.</div>
+  </div>
+
+  <div class="panel">
+    <div class="tabs" role="tablist" aria-label="Aufgabe / Tâche / Attività">
+      <button type="button" class="tab active" id="analyzeTab" role="tab" aria-selected="true" aria-controls="tab-analyze" data-tab="analyze">Beschreibung analysieren</button>
+      <button type="button" class="tab" id="generateTab" role="tab" aria-selected="false" aria-controls="tab-generate" tabindex="-1" data-tab="generate">Beschreibung generieren</button>
+    </div>
+
+    <div class="tabpanel active" id="tab-analyze" role="tabpanel" aria-labelledby="analyzeTab">
+      <label for="analyzeTitle">Titel des Datensatzes</label>
+      <input type="text" id="analyzeTitle" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
+      <label for="existing">Bestehende Beschreibung</label>
+      <textarea id="existing" placeholder="z. B. Die Daten dienen der Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr (UKV). Rechtsgrundlage ist das Güterverkehrsverlagerungsgesetz (GVVG)…"></textarea>
+      <div class="actions">
+        <button id="analyzeBtn" disabled>Beschreibung analysieren</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-generate" role="tabpanel" aria-labelledby="generateTab" hidden>
+      <label for="title">Titel des Datensatzes</label>
+      <input type="text" id="title" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
+      <div class="grid2">
+        <div>
+          <label for="purpose">Zweck</label>
+          <textarea id="purpose" placeholder="z. B. Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr"></textarea>
+        </div>
+        <div>
+          <label for="content">Inhalt</label>
+          <textarea id="content" placeholder="z. B. Plan- und Ist-Mengen (Anzahl Züge, Anzahl Sendungen) sowie Plan- und Ist-Erfolgsrechnungen je Relation"></textarea>
+        </div>
+        <div>
+          <label for="source">Erhebung / Quelle</label>
+          <textarea id="source" placeholder="z. B. Durch die Operateure im kombinierten Verkehr eingepflegt; Rechtsgrundlage: Güterverkehrsverlagerungsgesetz (GVVG)"></textarea>
+        </div>
+        <div>
+          <label for="completeness">Vollständigkeit und Aktualität</label>
+          <textarea id="completeness" placeholder="z. B. Jährliche Aktualisierung; Änderungen in der Erhebung werden je Berichtsjahr vermerkt"></textarea>
+        </div>
+        <div>
+          <label for="interpretation">Interpretation</label>
+          <textarea id="interpretation" placeholder="z. B. Enthält nur abgeltungsberechtigte Verkehre; keine Aussage zum gesamten Schienengüterverkehr möglich"></textarea>
+        </div>
+        <div>
+          <label for="spatial">Räumlicher Bezug</label>
+          <textarea id="spatial" placeholder="z. B. Alpenquerender Verkehr via Gotthard- und Lötschberg-Simplon-Achse, je Relation"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="generateBtn" disabled>Beschreibung generieren</button>
+      </div>
+    </div>
+
+    <button id="cancelBtn" class="secondary" hidden>Abbrechen</button>
+    <p id="resultStatus" class="status" role="status" aria-live="polite"></p>
+    <div class="result" id="result" aria-busy="false"></div>
+  </div>
+</main>
+
+<footer>
+  Läuft vollständig client-seitig über <a href="https://github.com/mlc-ai/web-llm" target="_blank">WebLLM</a>. Keine API-Keys, keine Server-Kosten. Nach dem Vorbild von
+  <a href="https://github.com/machinelearningZH/ogd_ai-metafairy" target="_blank">machinelearningZH/ogd_ai-metafairy</a> (MIT-Lizenz).
+</footer>
+
+<noscript><p>Bitte JavaScript aktivieren. / Veuillez activer JavaScript. / Attiva JavaScript.</p></noscript>
+
+<!-- APP_SCRIPT -->
+</body>
+</html>
