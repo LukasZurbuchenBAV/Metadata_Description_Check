@@ -24,4 +24,4 @@ Akzeptanzkriterien:
   prüfen; Antwortstruktur, Belegprüfung, Speicherbedarf und Abbruchverhalten abdecken.
 
 Dieser Einstellungsbereich ist noch nicht implementiert. Die aktuellen
-Entwicklereinstellungen sind im README beschrieben.
+Entwicklereinstellungen sind in [docs/development.md](docs/development.md) beschrieben.
