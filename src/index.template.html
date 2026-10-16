@@ -33,9 +33,10 @@
 
     <div class="tabpanel active" id="tab-analyze" role="tabpanel" aria-labelledby="analyzeTab">
       <label for="analyzeTitle">Titel des Datensatzes</label>
-      <input type="text" id="analyzeTitle" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
+      <input type="text" id="analyzeTitle" aria-describedby="analysisBudget" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
       <label for="existing">Bestehende Beschreibung</label>
-      <textarea id="existing" placeholder="z. B. Die Daten dienen der Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr (UKV). Rechtsgrundlage ist das Güterverkehrsverlagerungsgesetz (GVVG)…"></textarea>
+      <textarea id="existing" aria-describedby="analysisBudget" placeholder="z. B. Die Daten dienen der Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr (UKV). Rechtsgrundlage ist das Güterverkehrsverlagerungsgesetz (GVVG)…"></textarea>
+      <p id="analysisBudget" class="placeholder" role="status"></p>
       <div class="actions">
         <button id="analyzeBtn" disabled>Beschreibung analysieren</button>
       </div>
@@ -43,33 +44,34 @@
 
     <div class="tabpanel" id="tab-generate" role="tabpanel" aria-labelledby="generateTab" hidden>
       <label for="title">Titel des Datensatzes</label>
-      <input type="text" id="title" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
+      <input type="text" id="title" aria-describedby="generationBudget" placeholder="z. B. Alpenquerender kombinierter Verkehr: Mengen und Erfolgsrechnungen">
       <div class="grid2">
         <div>
           <label for="purpose">Zweck</label>
-          <textarea id="purpose" placeholder="z. B. Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr"></textarea>
+          <textarea id="purpose" aria-describedby="generationBudget" placeholder="z. B. Berechnung der Betriebsabgeltungen im alpenquerenden unbegleiteten kombinierten Verkehr"></textarea>
         </div>
         <div>
           <label for="content">Inhalt</label>
-          <textarea id="content" placeholder="z. B. Plan- und Ist-Mengen (Anzahl Züge, Anzahl Sendungen) sowie Plan- und Ist-Erfolgsrechnungen je Relation"></textarea>
+          <textarea id="content" aria-describedby="generationBudget" placeholder="z. B. Plan- und Ist-Mengen (Anzahl Züge, Anzahl Sendungen) sowie Plan- und Ist-Erfolgsrechnungen je Relation"></textarea>
         </div>
         <div>
           <label for="source">Erhebung / Quelle</label>
-          <textarea id="source" placeholder="z. B. Durch die Operateure im kombinierten Verkehr eingepflegt; Rechtsgrundlage: Güterverkehrsverlagerungsgesetz (GVVG)"></textarea>
+          <textarea id="source" aria-describedby="generationBudget" placeholder="z. B. Durch die Operateure im kombinierten Verkehr eingepflegt; Rechtsgrundlage: Güterverkehrsverlagerungsgesetz (GVVG)"></textarea>
         </div>
         <div>
           <label for="completeness">Vollständigkeit und Aktualität</label>
-          <textarea id="completeness" placeholder="z. B. Jährliche Aktualisierung; Änderungen in der Erhebung werden je Berichtsjahr vermerkt"></textarea>
+          <textarea id="completeness" aria-describedby="generationBudget" placeholder="z. B. Jährliche Aktualisierung; Änderungen in der Erhebung werden je Berichtsjahr vermerkt"></textarea>
         </div>
         <div>
           <label for="interpretation">Interpretation</label>
-          <textarea id="interpretation" placeholder="z. B. Enthält nur abgeltungsberechtigte Verkehre; keine Aussage zum gesamten Schienengüterverkehr möglich"></textarea>
+          <textarea id="interpretation" aria-describedby="generationBudget" placeholder="z. B. Enthält nur abgeltungsberechtigte Verkehre; keine Aussage zum gesamten Schienengüterverkehr möglich"></textarea>
         </div>
         <div>
           <label for="spatial">Räumlicher Bezug</label>
-          <textarea id="spatial" placeholder="z. B. Alpenquerender Verkehr via Gotthard- und Lötschberg-Simplon-Achse, je Relation"></textarea>
+          <textarea id="spatial" aria-describedby="generationBudget" placeholder="z. B. Alpenquerender Verkehr via Gotthard- und Lötschberg-Simplon-Achse, je Relation"></textarea>
         </div>
       </div>
+      <p id="generationBudget" class="placeholder" role="status"></p>
       <div class="actions">
         <button id="generateBtn" disabled>Beschreibung generieren</button>
       </div>

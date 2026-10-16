@@ -1,4 +1,4 @@
-import {TEMPERATURE} from '../src/config.js';
+import {TEMPERATURE, CONTEXT_WINDOW_SIZE} from '../src/config.js';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
@@ -6,6 +6,21 @@ import assert from 'node:assert/strict';
 import {checkBudget} from '../src/validation.js';
 
 const code=readFileSync(new URL('../src/inference-worker.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'');
+test('model loading applies the same context size used by the input budget',async()=>{
+  let loaded;
+  const replies=[];
+  class FakeEngine {
+    setInitProgressCallback(){}
+    async reload(id,options){ loaded={id,options}; }
+  }
+  const self={postMessage:message=>replies.push(message)};
+  const context=vm.createContext({self,CONTEXT_WINDOW_SIZE,MODEL_ID:'test-model',FakeEngine});
+  vm.runInContext(code.replace('await import(WEBLLM_URL)','({MLCEngine:FakeEngine})'),context);
+  await self.onmessage({data:{id:1,type:'load'}});
+  assert.equal(loaded.id,'test-model');
+  assert.equal(loaded.options.context_window_size,CONTEXT_WINDOW_SIZE);
+  assert.equal(replies.at(-1).type,'done');
+});
 async function generate(mode, temperature=TEMPERATURE){
   const requests=[],replies=[];
   const self={postMessage:message=>replies.push(message)};
@@ -136,4 +151,46 @@ test('a stale cancellation leaves the current stream intact',async()=>{
   await request;
   assert.equal(worker.replies.at(-1).type,'done');
   assert.equal(worker.replies.at(-1).value.text,'Current answer.');
+});
+
+test('cancellation exhausts the stream to release WebLLM 0.2.80 generation locks',async()=>{
+  let entered, locked=false, completions=0;
+  const started=new Promise(resolve=>{entered=resolve;});
+  const worker=streamingWorker(async function*(gate){
+    assert.equal(locked,false,'previous stream must release its lock before reuse');
+    locked=true;
+    entered();
+    await gate;
+    yield {choices:[{delta:{content:'Discard this cancelled output.'}}]};
+    yield {choices:[{delta:{},finish_reason:'stop'}]};
+    // The pinned runtime releases here, without a finally around the generator.
+    locked=false;
+    completions++;
+  });
+  const first=worker.send(generation(20));
+  await started;
+  await worker.send({id:20,type:'cancel'});
+  await first;
+  assert.equal(locked,false);
+  assert.equal(completions,1);
+  assert.equal(worker.replies.some(message=>message.type==='progress'),false);
+  assert.equal(worker.replies.at(-1).error,'CANCELLED');
+  await worker.send(generation(21));
+  assert.equal(completions,2);
+  assert.equal(worker.replies.at(-1).type,'done');
+});
+
+test('a native abort while draining cancellation still invalidates the runtime',async()=>{
+  let entered;
+  const started=new Promise(resolve=>{entered=resolve;});
+  const worker=streamingWorker(async function*(gate){
+    entered();
+    await gate;
+    throw new WebAssembly.RuntimeError('Aborted().');
+  });
+  const request=worker.send(generation(30));
+  await started;
+  await worker.send({id:30,type:'cancel'});
+  await request;
+  assert.equal(worker.replies.at(-1).error,'RUNTIME_ABORTED');
 });

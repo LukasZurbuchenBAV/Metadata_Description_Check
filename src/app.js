@@ -1,8 +1,8 @@
 import {checkWebGpuSupport} from './gpu.js';
-import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS, MAX_RETRIES} from './config.js';
+import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS, MAX_RETRIES, METADATA_MAX_BYTES} from './config.js';
 import {message, LI, UI, PH, TITLES} from './i18n.js';
 import {ANALYZE_SYSTEM, ANALYZE_RETRY_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from './prompts.js';
-import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
+import {analysisIsBad, generationIsBad, checkBudget, metadataBytes, checkMetadataBudget} from './validation.js';
 import {renderAnalysisXML, renderPlainText, attachCopy, escapeHtml} from './render.js';
 import {InferenceClient, generateResponse} from './inference.js';
 const loadBtn = document.getElementById('loadBtn');
@@ -38,6 +38,7 @@ function applyLang(){
   document.getElementById('cancelBtn').textContent = m('cancel');
   if(!loading && modelReady) status.textContent = m('ready');
   else if(!loading) status.textContent = gpuProblem ? m(gpuProblem) : m('hint');
+  updateInputHints();
 }
 const langSel = document.getElementById('lang');
 function setLang(l){ lang = l; langSel.value = l; applyLang(); }
@@ -74,6 +75,18 @@ applyLang();
 function errorText(error){
   const key = {INPUT_TOO_LONG:'budget', WORKER_ERROR:'workerErr', WORKER_TIMEOUT:'timeout', MODEL_NOT_READY:'first', CANCELLED:'cancelled', RUNTIME_ABORTED:'runtimeAborted'}[error.message];
   return key ? m(key) : error.message;
+}
+function analysisFields(){ return Object.fromEntries(['analyzeTitle','existing'].map(id=>[id,document.getElementById(id).value])); }
+function generationFields(){ return Object.fromEntries(['title','purpose','content','source','completeness','interpretation','spatial'].map(id=>[id,document.getElementById(id).value])); }
+function updateInputHints(){
+  for(const [id,fields] of [['analysisBudget',analysisFields()],['generationBudget',generationFields()]]){
+    const used = metadataBytes(fields);
+    const hint = document.getElementById(id);
+    hint.textContent = m('inputBudget').replace('{used}',used).replace('{limit}',METADATA_MAX_BYTES) + (used > METADATA_MAX_BYTES ? ' ' + m('shortenInput') : '');
+  }
+}
+for(const id of ['analyzeTitle','existing','title','purpose','content','source','completeness','interpretation','spatial']){
+  document.getElementById(id).addEventListener('input',updateInputHints);
 }
 function updateControls(){
   loadBtn.disabled = checking || busy || loading || !!gpuProblem;
@@ -176,6 +189,8 @@ analyzeBtn.addEventListener('click', ()=>{
   const source = {title, description:existing};
   const requestLang = lang;
 
+  try{ checkMetadataBudget(analysisFields()); }
+  catch(err){ resultEl.textContent = errorText(err); return; }
   run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, requestLang),
       {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS, mode:'analysis', retrySystem:ANALYZE_RETRY_SYSTEM});
 });
@@ -186,6 +201,8 @@ generateBtn.addEventListener('click', ()=>{
         completeness = v('completeness'), interpretation = v('interpretation'), spatial = v('spatial');
   if(busy || loading) return;
   if(![purpose,content,source,completeness,interpretation,spatial].some(Boolean)){ resultEl.textContent = m('empty'); return; }
+  try{ checkMetadataBudget(generationFields()); }
+  catch(err){ resultEl.textContent = errorText(err); return; }
   const prompt = generationPrompt({title,purpose,content,source,completeness,interpretation,spatial}, lang);
   run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:GENERATION_MAX_TOKENS});
 });

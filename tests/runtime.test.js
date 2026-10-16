@@ -30,6 +30,30 @@ test('rejects blank generation without invoking inference',()=>{
   const a=app();a.get('generateBtn').click();
   assert.match(a.get('result').textContent,/mindestens/);
 });
+test('input counters count accented text, translate and reject oversize submissions without inference',()=>{
+  const a=app();
+  assert.match(a.get('analysisBudget').textContent,/0 \/ 4500/);
+  a.get('analyzeTitle').value='ä';
+  a.get('existing').value='😀';
+  a.get('existing').input();
+  assert.match(a.get('analysisBudget').textContent,/6 \/ 4500/);
+  a.eval(`setLang('fr')`);
+  assert.match(a.get('analysisBudget').textContent,/octets/);
+  a.get('existing').value='x'.repeat(4500);
+  a.get('existing').input();
+  assert.match(a.get('analysisBudget').textContent,/Limite dépassée/);
+  a.eval(`modelReady=true;globalThis.calls=0;engine={ready:true,generate(){calls++;throw new Error('must not generate')}};`);
+  a.get('analyzeBtn').click();
+  assert.equal(a.eval('calls'),0);
+  assert.match(a.get('result').textContent,/4500/);
+  a.get('title').value='x'.repeat(4500);
+  a.get('content').value='y';
+  a.get('content').input();
+  assert.match(a.get('generationBudget').textContent,/4501 \/ 4500/);
+  a.get('generateBtn').click();
+  assert.equal(a.eval('calls'),0);
+  assert.match(a.get('result').textContent,/4500/);
+});
 test('rejects empty output, lists and labels without deleting prose',()=>{
   const a=app();
   for(const text of ['', '   ', '…', '- Messwerte', '1. Messwerte', 'Contenu: des mesures', 'Référence spatiale: Berne', 'Der Datensatz enthält', '<p>Messwerte.</p>']) {
@@ -41,7 +65,7 @@ test('rejects empty output, lists and labels without deleting prose',()=>{
 test('preflight reserves space for output and rejects oversize input',()=>{
   const a=app();
   assert.doesNotThrow(()=>a.eval(`checkBudget([{content:ANALYZE_SYSTEM},{content:'Titel: Wasser\\nBeschreibung: Messwerte im Kanton Bern.'}],1700)`));
-  assert.throws(()=>a.eval(`checkBudget([{content:'ä'.repeat(3000)}],1700)`),/INPUT_TOO_LONG/);
+  assert.throws(()=>a.eval(`checkBudget([{content:'ä'.repeat(CONTEXT_WINDOW_SIZE)}],1700)`),/INPUT_TOO_LONG/);
 });
 test('manual language choice is preserved when submitting French input',()=>{
   const a=app();

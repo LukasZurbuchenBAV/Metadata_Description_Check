@@ -1,4 +1,4 @@
-import {parseAnalysis, supported, analysisIsBad} from '../src/validation.js';
+import {parseAnalysis, supported, analysisIsBad, decodeXmlText} from '../src/validation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -33,6 +33,16 @@ test('missing, duplicate and invalid fields remain unavailable', ()=>{
   for (const text of ['<titel>Test</titel>', row('titel','Nitratwerte','10'), row('titel','Nitratwerte')+'<titel>Duplicate</titel>']) {
     assert.equal(parseAnalysis(text, source)[0].valid,false);
   }
+});
+
+test('XML entities are decoded once before matching evidence, including Unicode references',()=>{
+  const title='Wasser & Boden < 5 "mg" © 😀';
+  const encoded='Wasser &amp; Boden &lt; 5 &quot;mg&quot; &#169; &#x1F600;';
+  const parsed=parseAnalysis(row('titel',encoded),{title,description:''})[0];
+  assert.equal(parsed.evidence,title);
+  assert.equal(parsed.verified,true);
+  assert.equal(decodeXmlText('&amp;lt; &apos; &gt;'),'&lt; \' >');
+  assert.equal(decodeXmlText('&#0; &#xD800; &#x110000; &unknown;'),'&#0; &#xD800; &#x110000; &unknown;');
 });
 // Literal criterion names come from the documented seven-criterion output contract.
 const tags=['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];

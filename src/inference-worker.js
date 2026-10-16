@@ -1,4 +1,4 @@
-import {MODEL_ID, WEBLLM_URL, TEMPERATURE} from './config.js';
+import {MODEL_ID, WEBLLM_URL, TEMPERATURE, CONTEXT_WINDOW_SIZE} from './config.js';
 import {checkBudget} from './validation.js';
 
 let engine = null, active = null;
@@ -20,7 +20,7 @@ self.onmessage = async ({data:message})=>{
       const {MLCEngine} = await import(WEBLLM_URL);
       engine = new MLCEngine();
       engine.setInitProgressCallback(progress=>send(job.id,'progress',progress));
-      await engine.reload(MODEL_ID);
+      await engine.reload(MODEL_ID, {context_window_size:CONTEXT_WINDOW_SIZE});
     }else if(message.type === 'generate'){
       if(!engine) throw new Error('MODEL_NOT_READY');
       checkBudget(message.messages, message.maxTokens);
@@ -32,7 +32,9 @@ self.onmessage = async ({data:message})=>{
         extra_body:{enable_thinking:false}
       });
       for await(const chunk of stream){
-        if(job.cancelled) break;
+        // WebLLM 0.2.80 releases its generation lock only when the stream is
+        // exhausted. Drain after interrupt; the client enforces a fixed deadline.
+        if(job.cancelled) continue;
         text += chunk.choices[0]?.delta?.content || '';
         if(chunk.choices[0]?.finish_reason === 'length') cut = true;
         // Limit cross-thread messages and DOM work during streaming.
@@ -45,6 +47,7 @@ self.onmessage = async ({data:message})=>{
   }catch(error){
     const detail = String(error.message || error);
     const aborted = /\bAborted\(|memory access out of bounds|unreachable/i.test(detail);
-    self.postMessage({id:job.id,type:'error',error:job.cancelled ? 'CANCELLED' : aborted ? 'RUNTIME_ABORTED' : detail, ...(aborted ? {detail} : {})});
+    // A native abort still invalidates the runtime if it happens while draining.
+    self.postMessage({id:job.id,type:'error',error:aborted ? 'RUNTIME_ABORTED' : job.cancelled ? 'CANCELLED' : detail, ...(aborted ? {detail} : {})});
   }finally{ active = null; }
 };

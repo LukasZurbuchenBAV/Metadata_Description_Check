@@ -17,6 +17,8 @@ konfiguriert und deren Lizenzen beachtet werden.
 ## Ergebnisse
 
 - Zitate müssen zusammenhängend im Titel bzw. in der Beschreibung vorkommen.
+  XML-Zeichenreferenzen wie `&amp;`, `&lt;` und numerische Referenzen werden vor
+  dem Vergleich einmal decodiert; bei der Anzeige wird sämtlicher Text sicher maskiert.
   Nur Unicode-Normalisierung und Leerraum werden vereinheitlicht. Das prüft weder
   die Relevanz des Zitats noch die Wahrheit der Aussage.
 - Modellnoten bleiben unverändert. Fehlende Felder erhalten keine Ersatznoten;
@@ -24,8 +26,16 @@ konfiguriert und deren Lizenzen beachtet werden.
 - Wiederholungen gelten nur für ungültige Antworten, nicht für Kürzungen oder
   Laufzeitfehler. Die angezeigte Dauer schliesst Wiederholungen ein.
 - Das Eingabebudget nutzt UTF-8-Bytes als konservative Token-Obergrenze mit Antwortreserve.
+  Das Modell wird ausdrücklich mit 8192 Kontext-Tokens geladen. Titel und Textfelder
+  dürfen zusammen 4500 UTF-8-Bytes enthalten; die Oberfläche zählt den getrimmten Text
+  über alle Felder. Das entspricht bei üblichen Texten etwa 3500–4500 Zeichen.
+  Anweisungen, Feldbezeichnungen, 256 Tokens für die Chat-Vorlage und die gesamte
+  Antwortreserve (1700/700 Tokens) passen zusätzlich in den Kontext.
   Es kann passende Texte zurückweisen, kürzt aber nichts stillschweigend. Diese Annahme
   gilt für die Byte-Tokenisierung des aktuellen Qwen-Modells, nicht für beliebige Modelle.
+- Beim Abbrechen wird die Generierung unterbrochen und der Stream bis zum Ende gelesen,
+  ohne weiteren Text anzuzeigen. Nur so gibt WebLLM 0.2.80 seine Generierungssperre frei.
+  Wird die Abbruchfrist überschritten, verwirft der Client den Worker.
 
 ## Kompatibilität
 

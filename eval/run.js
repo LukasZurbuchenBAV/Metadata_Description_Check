@@ -1,6 +1,6 @@
 // Optional browser-only evaluation. No requests are sent to an inference service.
 import {InferenceClient} from '../src/inference.js';
-import {MODEL_ID, WEBLLM_VERSION, ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS} from '../src/config.js';
+import {MODEL_ID, WEBLLM_VERSION, ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS, CONTEXT_WINDOW_SIZE, METADATA_MAX_BYTES} from '../src/config.js';
 import {ANALYZE_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from '../src/prompts.js';
 import {parseAnalysis, generationIsBad, checkBudget} from '../src/validation.js';
 
@@ -44,7 +44,7 @@ export async function runEvaluation({repeats=3, ids, onProgress=console.info, si
         }
       }
     }
-    return {model:MODEL_ID,webllm:WEBLLM_VERSION,timestamp:new Date().toISOString(),repeats,results};
+    return {model:MODEL_ID,webllm:WEBLLM_VERSION,contextWindowSize:CONTEXT_WINDOW_SIZE,metadataMaxBytes:METADATA_MAX_BYTES,timestamp:new Date().toISOString(),repeats,results};
   }finally{
     signal?.removeEventListener('abort',abort);
     engine.unload();

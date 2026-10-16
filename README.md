@@ -20,9 +20,13 @@ Kein API-Key, kein eigener Server, keine Installation.
    ist ein zusammenhängender Fliesstext, der kopiert werden kann.
 
 Benötigt einen Browser mit **WebGPU und `shader-f16`**, z. B. Chrome oder Edge auf
-Desktop, sowie ungefähr **3.4 GB GPU-Speicher**. Auf integrierter Grafik kann eine
+Desktop, sowie ungefähr **4.1 GB GPU-Speicher**. Auf integrierter Grafik kann eine
 Antwort mehrere Minuten dauern. Vorgänge lassen sich abbrechen; nach einem
 Laufzeitfehler das Modell erneut laden. Eingaben bleiben dabei erhalten.
+
+Pro Anfrage sind **4500 UTF-8-Bytes** für Titel und Textfelder zusammen möglich
+(bei üblichen deutschen, französischen und italienischen Texten etwa 3500–4500 Zeichen).
+Ein Zähler zeigt den aktuellen Umfang; zu lange Eingaben werden ohne Kürzung abgewiesen.
 
 **Ergebnisse selbst prüfen:** Die KI kann Angaben übersehen oder erfinden.
 Ein geprüftes Zitat bestätigt weder die Qualität der Bewertung noch die Wahrheit der Aussage.

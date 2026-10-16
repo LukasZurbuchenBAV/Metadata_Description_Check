@@ -1,11 +1,31 @@
-import {CONTEXT_WINDOW_SIZE, CHAT_TEMPLATE_RESERVE} from './config.js';
+import {CONTEXT_WINDOW_SIZE, CHAT_TEMPLATE_RESERVE, METADATA_MAX_BYTES} from './config.js';
+
+// Decode XML character references once, without interpreting markup or HTML entities.
+export function decodeXmlText(text){
+  const named = {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"};
+  return text.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (entity, name)=>{
+    if(name[0] !== '#') return named[name] ?? entity;
+    const code = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2),16) : Number(name.slice(1));
+    const valid = code === 9 || code === 10 || code === 13 ||
+      (code >= 0x20 && code <= 0xD7FF) || (code >= 0xE000 && code <= 0xFFFD) ||
+      (code >= 0x10000 && code <= 0x10FFFF);
+    return valid ? String.fromCodePoint(code) : entity;
+  });
+}
+
+export function metadataBytes(fields){
+  return Object.values(fields).reduce((sum,value)=>sum + new TextEncoder().encode(value.trim()).length,0);
+}
+export function checkMetadataBudget(fields){
+  if(metadataBytes(fields) > METADATA_MAX_BYTES) throw new Error('INPUT_TOO_LONG');
+}
 
 export function parseAnalysis(text, source){
   return ANALYSIS_TAGS.map(tag=>{
     const fields = ['', '-beleg', '-tipp', '-score'].map(suffix=>{
       const name = tag + suffix;
       const matches = [...text.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'gi'))];
-      return matches.length === 1 ? matches[0][1].trim() : '';
+      return matches.length === 1 ? decodeXmlText(matches[0][1]).trim() : '';
     });
     const [body, evidence, tip, scoreText] = fields;
     const score = /^[1-5]$/.test(scoreText) ? Number(scoreText) : null;
@@ -27,7 +47,7 @@ export function generationIsBad(text){
 }
 export function checkBudget(messages, maxTokens){
   // Qwen3 uses a byte-level tokenizer: UTF-8 bytes conservatively bound text tokens.
-  // Reserve 256 tokens for chat-template markers and 1700/700 for the answer.
+  // Reserve chat-template markers and the entire requested answer budget.
   const bytes = messages.reduce((n,message)=>n + new TextEncoder().encode(message.content).length,0);
   if(bytes + CHAT_TEMPLATE_RESERVE + maxTokens > CONTEXT_WINDOW_SIZE) throw new Error('INPUT_TOO_LONG');
   return bytes;

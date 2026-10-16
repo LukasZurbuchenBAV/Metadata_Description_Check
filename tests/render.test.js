@@ -27,3 +27,14 @@ test('unrecognized placeholder responses show a format failure instead of seven 
   assert.equal(html.includes('class="cat"'),false);
   assert.equal(html.includes('/5'),false);
 });
+
+test('encoded XML text renders as readable evidence while encoded markup stays inert',()=>{
+  const title='Wasser & Boden < 5';
+  const xml='<titel>Wasser &amp; Boden &lt; 5</titel><titel-beleg>Wasser &amp; Boden &lt; 5</titel-beleg><titel-tipp>&lt;img src=x onerror=alert(1)&gt;</titel-tipp><titel-score>4</titel-score>';
+  const html=renderAnalysisXML(xml,{title,description:''},'de');
+  assert.ok(html.includes('Fundstelle: «Wasser &amp; Boden &lt; 5»'));
+  assert.equal(html.includes('&amp;lt;'),false);
+  assert.equal(html.includes('&amp;amp;'),false);
+  assert.equal(html.includes('<img'),false);
+  assert.ok(html.includes('&lt;img'));
+});

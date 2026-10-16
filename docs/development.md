@@ -24,7 +24,12 @@ klassischen Blob-Worker ein. Endanwender öffnen die fertige Datei ohne Build od
   Fortschritt setzt die Inaktivitätsgrenze zurück, aber nicht die Abbruchfrist.
 - `MODEL_GPU_MEMORY_GB`: Speicher-Schätzung für die Anzeige, keine harte Zulassungsgrenze.
 - `REQUIRED_GPU_FEATURES`: vor dem Laden geprüfte GPU-Funktionen; `[]` ist möglich.
-- Kontextfenster, Reserve für die Chat-Vorlage und Ausgabelimits für beide Modi.
+- `CONTEXT_WINDOW_SIZE` (8192): wird auch an `engine.reload` übergeben.
+  `METADATA_MAX_BYTES` (4500): gemeinsames UTF-8-Limit aller Metadatenfelder pro Anfrage.
+  Reserve für die Chat-Vorlage und Ausgabelimits für beide Modi. Der Budgettest prüft,
+  dass das volle Metadatenlimit mit den lokalisierten Anweisungen beider Modi und
+  den Analyse-Wiederholungen passt. Ein grösserer Kontext benötigt mehr GPU-Speicher;
+  die aktuelle Anzeige schätzt dafür ca. 4.1 GB.
 
 Nach Änderungen neu erzeugen: Die fertige HTML-Datei liest die Konfiguration nicht nach.
 Beim Modellwechsel GPU-Anforderungen, Tokenisierung, Kontext-/Ausgabelimits, Prompts

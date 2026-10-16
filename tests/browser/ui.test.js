@@ -127,6 +127,10 @@ for(const transport of ['http','file']) test(`${transport}: standalone app loads
   await cdp.evaluate(`document.getElementById('generateBtn').click()`);
   assert.match(await cdp.evaluate(`document.getElementById('result').textContent`),/mindestens/);
   assert.equal(await cdp.evaluate(`__requests.filter(r=>r.type==='generate').length`),0);
+  await cdp.evaluate(`document.getElementById('content').value='ä'.repeat(2250)+'x';document.getElementById('content').dispatchEvent(new Event('input'));document.getElementById('generateBtn').click()`);
+  assert.match(await cdp.evaluate(`document.getElementById('generationBudget').textContent`),/4501 \/ 4500/);
+  assert.match(await cdp.evaluate(`document.getElementById('result').textContent`),/4500/);
+  assert.equal(await cdp.evaluate(`__requests.filter(r=>r.type==='generate').length`),0,'oversize metadata never reaches inference');
   await cdp.evaluate(`document.getElementById('content').value='Messwerte';document.getElementById('generateBtn').click()`);
   for(const id of ['loadBtn','analyzeBtn','generateBtn','lang']) assert.equal(await cdp.evaluate(`document.getElementById('${id}').disabled`),true,id);
   await cdp.until(`document.querySelector('#result button') !== null`);
@@ -143,10 +147,10 @@ for(const transport of ['http','file']) test(`${transport}: standalone app loads
   await cdp.evaluate(`
     window.__mode='ok';
     window.__response=['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'].map(tag=>
-      '<'+tag+'>Teilweise &lt;test&gt;.</'+tag+'><'+tag+'-beleg>'+(tag==='titel'?'Test':tag==='vollstaendigkeit'?'jährlich aktualisiert':'none')+'</'+tag+'-beleg><'+tag+'-tipp>Abdeckung ergänzen.</'+tag+'-tipp><'+tag+'-score>2</'+tag+'-score>'
+      '<'+tag+'>Teilweise &lt;test&gt;.</'+tag+'><'+tag+'-beleg>'+(tag==='titel'?'Test &amp; Werte &lt; 5':tag==='vollstaendigkeit'?'jährlich aktualisiert':'none')+'</'+tag+'-beleg><'+tag+'-tipp>Abdeckung ergänzen.</'+tag+'-tipp><'+tag+'-score>2</'+tag+'-score>'
     ).join('');
     document.getElementById('analyzeTab').click();
-    document.getElementById('analyzeTitle').value='Test';
+    document.getElementById('analyzeTitle').value='Test & Werte < 5';
     document.getElementById('existing').value='Die Daten werden jährlich aktualisiert.';
     document.getElementById('analyzeBtn').click();
     document.getElementById('existing').value='Ein anderer Text.';
@@ -154,6 +158,9 @@ for(const transport of ['http','file']) test(`${transport}: standalone app loads
   await cdp.until(`!document.getElementById('analyzeBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].querySelector('.score').textContent`),'2/5');
   assert.match(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].textContent`),/jährlich aktualisiert/,'evidence uses the submitted source snapshot');
+  assert.match(await cdp.evaluate(`document.querySelector('#result .cat').textContent`),/Fundstelle: «Test & Werte < 5»/);
+  assert.match(await cdp.evaluate(`document.querySelector('#result .cat').textContent`),/Teilweise <test>\./);
+  assert.equal(await cdp.evaluate(`document.querySelector('#result .cat test')`),null,'decoded XML stays text');
   await cdp.evaluate(`
     window.__response='<NAME-beleg>Test</NAME-beleg><NAME>Bewertung.</NAME><NAME-tipp>Prüfen.</NAME-tipp><NAME-score>5</NAME-score>';
     window.__beforeRetry=__requests.filter(request=>request.type==='generate').length;
@@ -181,6 +188,7 @@ for(const transport of ['http','file']) test(`${transport}: standalone app loads
   await cdp.evaluate(`document.getElementById('lang').value='fr';document.getElementById('lang').dispatchEvent(new Event('change'))`);
   assert.equal(await cdp.evaluate(`document.documentElement.lang`),'fr');
   assert.match(await cdp.evaluate(`document.getElementById('generateBtn').textContent`),/Générer/);
+  assert.match(await cdp.evaluate(`document.getElementById('generationBudget').textContent`),/octets UTF-8/);
   // Exercise the actual embedded worker without local module requests or a model download.
   assert.equal(await cdp.evaluate(`new Promise((resolve,reject)=>{const w=new __NativeWorker(window.__workerURL);w.onmessage=e=>{w.terminate();resolve(e.data.error)};w.onerror=e=>{w.terminate();reject(new Error(e.message))};w.postMessage({id:1,type:'unknown'});})`),'WORKER_ERROR');
   await cdp.send('Emulation.setDeviceMetricsOverride',{width:375,height:812,deviceScaleFactor:1,mobile:true});

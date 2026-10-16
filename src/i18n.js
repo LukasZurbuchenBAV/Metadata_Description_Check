@@ -1,4 +1,4 @@
-import {MODEL_NAME, MODEL_SIZE_LABEL, MODEL_GPU_MEMORY_GB, REQUIRED_GPU_FEATURES} from './config.js';
+import {MODEL_NAME, MODEL_SIZE_LABEL, MODEL_GPU_MEMORY_GB, REQUIRED_GPU_FEATURES, METADATA_MAX_BYTES, CONTEXT_WINDOW_SIZE} from './config.js';
 export const LI = {de:0, fr:1, it:2};
 export const LANG_NAME = {de:'Deutsch', fr:'Französisch', it:'Italienisch'};
 const S = MODEL_SIZE_LABEL;
@@ -39,7 +39,9 @@ const MSG = {
   failed: ['Bearbeitung fehlgeschlagen. Bitte Fehlermeldung beachten.', 'Le traitement a échoué. Consultez le message d’erreur.', 'Elaborazione non riuscita. Consulta il messaggio di errore.'],
   finished: ['Bearbeitung beendet. Ergebnis unten prüfen.', 'Traitement terminé. Vérifiez le résultat ci-dessous.', 'Elaborazione terminata. Controlla il risultato qui sotto.'],
   empty: ['Bitte eine Beschreibung bzw. mindestens ein inhaltliches Feld ausfüllen.', 'Veuillez saisir une description ou au moins un champ de contenu.', 'Inserisci una descrizione o almeno un campo di contenuto.'],
-  budget: ['Eingabe zu lang für das 4096-Token-Kontextfenster (konservative UTF-8-Obergrenze inklusive Antwortreserve). Bitte Text kürzen.', 'Texte trop long pour le contexte de 4096 tokens (borne UTF-8 prudente, réponse réservée). Veuillez raccourcir le texte.', 'Testo troppo lungo per il contesto di 4096 token (limite UTF-8 prudente con spazio per la risposta). Accorcia il testo.'],
+  inputBudget: ['Textumfang: {used} / {limit} UTF-8-Bytes insgesamt (Titel und Text). Akzente und Sonderzeichen benötigen mehr als ein Byte.', 'Volume : {used} / {limit} octets UTF-8 au total (titre et texte). Les accents et caractères spéciaux occupent plusieurs octets.', 'Dimensione: {used} / {limit} byte UTF-8 totali (titolo e testo). Accenti e caratteri speciali occupano più byte.'],
+  shortenInput: ['Limit überschritten. Bitte Text kürzen.', 'Limite dépassée. Veuillez raccourcir le texte.', 'Limite superato. Accorcia il testo.'],
+  budget: [`Eingabe zu lang. Maximal ${METADATA_MAX_BYTES} UTF-8-Bytes für Titel und Text zusammen; zusätzlich müssen Anweisungen und Antwort in ${CONTEXT_WINDOW_SIZE} Tokens passen. Bitte Text kürzen.`, `Texte trop long. Maximum ${METADATA_MAX_BYTES} octets UTF-8 pour le titre et le texte réunis ; les consignes et la réponse doivent aussi tenir dans ${CONTEXT_WINDOW_SIZE} tokens. Veuillez raccourcir le texte.`, `Testo troppo lungo. Massimo ${METADATA_MAX_BYTES} byte UTF-8 per titolo e testo insieme; istruzioni e risposta devono anche rientrare in ${CONTEXT_WINDOW_SIZE} token. Accorcia il testo.`],
   cancelled: ['Abgebrochen.', 'Annulé.', 'Annullato.'],
   cancel: ['Abbrechen', 'Annuler', 'Annulla'],
   copyErr: ['Kopieren fehlgeschlagen. Bitte Text manuell kopieren.', 'Échec de la copie. Copiez le texte manuellement.', 'Copia non riuscita. Copia il testo manualmente.'],
