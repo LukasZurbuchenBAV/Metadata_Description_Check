@@ -31,7 +31,7 @@ test('rejects blank generation without invoking inference',()=>{
 });
 test('rejects empty output, lists and labels without deleting prose',()=>{
   const a=app();
-  for(const text of ['', '   ', '…', '- Messwerte', '1. Messwerte', 'Contenu: des mesures', 'Référence spatiale: Berne']) {
+  for(const text of ['', '   ', '…', '- Messwerte', '1. Messwerte', 'Contenu: des mesures', 'Référence spatiale: Berne', 'Der Datensatz enthält', '<p>Messwerte.</p>']) {
     a.eval(`globalThis.text=${JSON.stringify(text)}`);
     assert.equal(a.eval('generationIsBad(text)'),true,text);
   }

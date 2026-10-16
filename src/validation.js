@@ -21,7 +21,7 @@ export function cleanGenerated(text){
 }
 export function generationIsBad(text){
   const t = cleanGenerated(text);
-  return !t || !/[\p{L}]/u.test(t) || /^(?:#{1,6}\s|[-*•]\s|\d+[.)]\s)/m.test(t)
+  return !t || !/[\p{L}]/u.test(t) || !/[.!?]$/.test(t) || /<\/?[a-z][^>]*>/i.test(t) || /^(?:#{1,6}\s|[-*•]\s|\d+[.)]\s)/m.test(t)
     || /(?:Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\s*\/?\s*Quelle|Vollständigkeit|Complétude|Completezza|Interpretation|Interprétation|Interpretazione|Räumlicher Bezug|Référence spatiale|Riferimento spaziale)\s*:/i.test(t)
     || /(?:enthält|contient|contiene)\s*(?:…|\.\.\.)/.test(t);
 }
