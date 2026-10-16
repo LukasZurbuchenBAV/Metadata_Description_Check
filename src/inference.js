@@ -1,8 +1,9 @@
+import {WORKER_TIMEOUT_MS, CANCEL_TIMEOUT_MS} from './config.js';
 import {createInferenceWorker} from './worker-loader.js';
 
 // Only this adapter knows the worker protocol. It owns timeouts and stale replies.
 export class InferenceClient {
-  constructor({workerFactory, timeoutMs=300_000, cancelTimeoutMs=10_000}={}){
+  constructor({workerFactory, timeoutMs=WORKER_TIMEOUT_MS, cancelTimeoutMs=CANCEL_TIMEOUT_MS}={}){
     this.workerFactory = workerFactory || createInferenceWorker;
     this.timeoutMs = timeoutMs;
     this.cancelTimeoutMs = cancelTimeoutMs;

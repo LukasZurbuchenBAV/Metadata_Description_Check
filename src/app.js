@@ -1,4 +1,5 @@
-import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS} from './config.js';
+import {checkWebGpuSupport} from './gpu.js';
+import {ANALYSIS_MAX_TOKENS, GENERATION_MAX_TOKENS, MAX_RETRIES} from './config.js';
 import {message, LI, UI, PH, TITLES} from './i18n.js';
 import {ANALYZE_SYSTEM, ANALYZE_RETRY_SYSTEM, GENERATE_SYSTEM, analysisPrompt, generationPrompt, localizedSystem} from './prompts.js';
 import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
@@ -62,15 +63,6 @@ tabs.forEach((tab,index)=>{
   });
 });
 
-async function checkWebGpuSupport(){
-  if(!navigator.gpu) return 'noGpu';
-  try{
-    const adapter = await navigator.gpu.requestAdapter();
-    if(!adapter) return 'noAdapter';
-    if(!adapter.features.has('shader-f16')) return 'noF16';
-  }catch(err){ return 'noCheck'; }
-  return null;
-}
 applyLang();
 (async ()=>{
   gpuProblem = await checkWebGpuSupport();
@@ -144,7 +136,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
     document.getElementById('resultStatus').textContent = m('working');
     resultEl.textContent = m('working');
     let response = await ask(userPrompt);
-    if(!cancelled && !response.cut && opts.isBad(response.text)){
+    for(let retry=0; retry<MAX_RETRIES && !cancelled && !response.cut && opts.isBad(response.text); retry++){
       // Use corrective instructions, keeping the original input and evidence checks.
       resultEl.textContent = m('retry');
       response = await ask(userPrompt, opts.retrySystem ? localizedSystem(opts.retrySystem, requestLang) : systemPrompt);

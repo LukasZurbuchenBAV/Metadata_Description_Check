@@ -78,10 +78,10 @@
 <main>
   <div class="panel">
     <div class="modelrow">
-      <button id="loadBtn">Modell laden (Qwen3-4B, ca. 2.5 GB)</button>
+      <button id="loadBtn" disabled>Modell laden</button>
     </div>
     <div class="progresswrap" id="progresswrap" role="progressbar" aria-label="Modell / Modèle / Modello" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progressbar" id="progressbar"></div></div>
-    <div class="status" id="status" role="status" aria-live="polite">Qwen3-4B: ca. 2.5 GB Download, ca. 3.4 GB GPU-Speicher. WebGPU mit shader-f16 erforderlich. Modell wird erst auf Knopfdruck geladen.</div>
+    <div class="status" id="status" role="status" aria-live="polite">Die Anwendung wird gestartet…</div>
   </div>
 
   <div class="panel">
@@ -150,7 +150,7 @@
 <script>
 'use strict';
 (()=>{
-const STANDALONE_WORKER_SOURCE = "// src/config.js\nconst MODEL_ID = 'Qwen3-4B-q4f16_1-MLC';\nconst MODEL_NAME = 'Qwen3-4B';\nconst MODEL_SIZE_LABEL = 'ca. 2.5 GB';\nconst WEBLLM_VERSION = '0.2.80';\n// May be replaced with an absolute URL to a reviewed, self-hosted ES module bundle.\nconst WEBLLM_URL = `https://esm.run/@mlc-ai/web-llm@${WEBLLM_VERSION}`;\nconst CONTEXT_WINDOW_SIZE = 4096;\nconst CHAT_TEMPLATE_RESERVE = 256;\nconst ANALYSIS_MAX_TOKENS = 1700;\nconst GENERATION_MAX_TOKENS = 700;\n\n// src/validation.js\nfunction parseAnalysis(text, source){\n  return ANALYSIS_TAGS.map(tag=>{\n    const fields = ['', '-beleg', '-tipp', '-score'].map(suffix=>{\n      const name = tag + suffix;\n      const matches = [...text.matchAll(new RegExp(`<${name}>([\\\\s\\\\S]*?)</${name}>`, 'gi'))];\n      return matches.length === 1 ? matches[0][1].trim() : '';\n    });\n    const [body, evidence, tip, scoreText] = fields;\n    const score = /^[1-5]$/.test(scoreText) ? Number(scoreText) : null;\n    const missingEvidence = /^(keine|aucun|aucune|nessuno|nessuna|none|–|-)$/i.test(evidence);\n    const valid = fields.every(Boolean) && score !== null;\n    const verified = !missingEvidence && supported(evidence, tag === 'titel' ? source.title : source.description);\n    return {tag, body, evidence, tip, score, valid, verified, missingEvidence};\n  });\n}\nfunction cleanGenerated(text){\n  // Preserve content inside emphasis. Never delete whole lines of model output.\n  return text.trim().replace(/^[\"«„“]([\\s\\S]*)[\"»“”]$/, '$1').replace(/\\*\\*([^*]+)\\*\\*/g, '$1').trim();\n}\nfunction generationIsBad(text){\n  const t = cleanGenerated(text);\n  return !t || !/[\\p{L}]/u.test(t) || !/[.!?]$/.test(t) || /<\\/?[a-z][^>]*>/i.test(t) || /^(?:#{1,6}\\s|[-*•]\\s|\\d+[.)]\\s)/m.test(t)\n    || /(?:Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\\s*\\/?\\s*Quelle|Vollständigkeit|Complétude|Completezza|Interpretation|Interprétation|Interpretazione|Räumlicher Bezug|Référence spatiale|Riferimento spaziale)\\s*:/i.test(t)\n    || /(?:enthält|contient|contiene)\\s*(?:…|\\.\\.\\.)/.test(t);\n}\nfunction checkBudget(messages, maxTokens){\n  // Qwen3 uses a byte-level tokenizer: UTF-8 bytes conservatively bound text tokens.\n  // Reserve 256 tokens for chat-template markers and 1700/700 for the answer.\n  const bytes = messages.reduce((n,message)=>n + new TextEncoder().encode(message.content).length,0);\n  if(bytes + CHAT_TEMPLATE_RESERVE + maxTokens > CONTEXT_WINDOW_SIZE) throw new Error('INPUT_TOO_LONG');\n  return bytes;\n}\n\nconst norm = x => x.normalize('NFC').replace(/\\s+/g,' ').trim();\nfunction supported(quote, source){\n  return !!quote && !!norm(quote) && norm(source).includes(norm(quote));\n}\n\n\nconst ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];\nfunction analysisIsBad(text, source){return parseAnalysis(text, source).some(row=>!row.valid || (!row.missingEvidence && !row.verified));}\n\n// src/inference-worker.js\nlet engine = null, active = null;\nconst send = (id,type,value)=>self.postMessage({id,type,value});\nself.onmessage = async ({data:message})=>{\n  if(message.type === 'cancel'){\n    if(active?.id === message.id){\n      active.cancelled = true;\n      engine?.interruptGenerate();\n    }\n    return;\n  }\n  if(active){ self.postMessage({id:message.id,type:'error',error:'BUSY'}); return; }\n  const job = active = {id:message.id, cancelled:false};\n  try{\n    let value;\n    if(message.type === 'load'){\n      // Import errors are returned through the same protocol as model-load failures.\n      const {MLCEngine} = await import(WEBLLM_URL);\n      engine = new MLCEngine();\n      engine.setInitProgressCallback(progress=>send(job.id,'progress',progress));\n      await engine.reload(MODEL_ID);\n    }else if(message.type === 'generate'){\n      if(!engine) throw new Error('MODEL_NOT_READY');\n      checkBudget(message.messages, message.maxTokens);\n      let text = '', cut = false, updated = 0;\n      const stream = await engine.chat.completions.create({\n        messages:message.messages, temperature:0.2, max_tokens:message.maxTokens, stream:true,\n        // WebLLM 0.2.80's XGrammar path can abort the WASM runtime (upstream #807).\n        // Keep normal text decoding; enforce XML through prompts and validation.\n        extra_body:{enable_thinking:false}\n      });\n      for await(const chunk of stream){\n        if(job.cancelled) break;\n        text += chunk.choices[0]?.delta?.content || '';\n        if(chunk.choices[0]?.finish_reason === 'length') cut = true;\n        // Limit cross-thread messages and DOM work during streaming.\n        if(performance.now()-updated >= 100){ send(job.id,'progress',text); updated = performance.now(); }\n      }\n      value = {text:text.replace(/<think>[\\s\\S]*?<\\/think>/g,''),cut};\n    }else throw new Error('WORKER_ERROR');\n    if(job.cancelled) throw new Error('CANCELLED');\n    send(job.id,'done',value);\n  }catch(error){\n    const detail = String(error.message || error);\n    const aborted = /\\bAborted\\(|memory access out of bounds|unreachable/i.test(detail);\n    self.postMessage({id:job.id,type:'error',error:job.cancelled ? 'CANCELLED' : aborted ? 'RUNTIME_ABORTED' : detail, ...(aborted ? {detail} : {})});\n  }finally{ active = null; }\n};";
+const STANDALONE_WORKER_SOURCE = "// src/config.js\nconst MODEL_ID = 'Qwen3-4B-q4f16_1-MLC';\nconst MODEL_NAME = 'Qwen3-4B';\nconst MODEL_SIZE_LABEL = 'ca. 2.5 GB';\nconst WEBLLM_VERSION = '0.2.80';\n// May be replaced with an absolute URL to a reviewed, self-hosted ES module bundle.\nconst WEBLLM_URL = `https://esm.run/@mlc-ai/web-llm@${WEBLLM_VERSION}`;\nconst CONTEXT_WINDOW_SIZE = 4096;\nconst CHAT_TEMPLATE_RESERVE = 256;\nconst ANALYSIS_MAX_TOKENS = 1700;\nconst GENERATION_MAX_TOKENS = 700;\n\n// Sampling and validation retries (retries after the first attempt; integer >= 0).\nconst TEMPERATURE = 0.2;\nconst MAX_RETRIES = 1;\n\n// Worker inactivity deadline and grace period after cancelling, in milliseconds.\nconst WORKER_TIMEOUT_MS = 300_000;\nconst CANCEL_TIMEOUT_MS = 10_000;\n\n// Model requirements: memory is an estimate for display, not an allocation limit.\nconst MODEL_GPU_MEMORY_GB = 3.4;\nconst REQUIRED_GPU_FEATURES = Object.freeze(['shader-f16']);\n\n// src/validation.js\nfunction parseAnalysis(text, source){\n  return ANALYSIS_TAGS.map(tag=>{\n    const fields = ['', '-beleg', '-tipp', '-score'].map(suffix=>{\n      const name = tag + suffix;\n      const matches = [...text.matchAll(new RegExp(`<${name}>([\\\\s\\\\S]*?)</${name}>`, 'gi'))];\n      return matches.length === 1 ? matches[0][1].trim() : '';\n    });\n    const [body, evidence, tip, scoreText] = fields;\n    const score = /^[1-5]$/.test(scoreText) ? Number(scoreText) : null;\n    const missingEvidence = /^(keine|aucun|aucune|nessuno|nessuna|none|–|-)$/i.test(evidence);\n    const valid = fields.every(Boolean) && score !== null;\n    const verified = !missingEvidence && supported(evidence, tag === 'titel' ? source.title : source.description);\n    return {tag, body, evidence, tip, score, valid, verified, missingEvidence};\n  });\n}\nfunction cleanGenerated(text){\n  // Preserve content inside emphasis. Never delete whole lines of model output.\n  return text.trim().replace(/^[\"«„“]([\\s\\S]*)[\"»“”]$/, '$1').replace(/\\*\\*([^*]+)\\*\\*/g, '$1').trim();\n}\nfunction generationIsBad(text){\n  const t = cleanGenerated(text);\n  return !t || !/[\\p{L}]/u.test(t) || !/[.!?]$/.test(t) || /<\\/?[a-z][^>]*>/i.test(t) || /^(?:#{1,6}\\s|[-*•]\\s|\\d+[.)]\\s)/m.test(t)\n    || /(?:Zweck|But|Objectif|Scopo|Inhalt|Contenu|Contenuto|Source|Fonte|Erhebung\\s*\\/?\\s*Quelle|Vollständigkeit|Complétude|Completezza|Interpretation|Interprétation|Interpretazione|Räumlicher Bezug|Référence spatiale|Riferimento spaziale)\\s*:/i.test(t)\n    || /(?:enthält|contient|contiene)\\s*(?:…|\\.\\.\\.)/.test(t);\n}\nfunction checkBudget(messages, maxTokens){\n  // Qwen3 uses a byte-level tokenizer: UTF-8 bytes conservatively bound text tokens.\n  // Reserve 256 tokens for chat-template markers and 1700/700 for the answer.\n  const bytes = messages.reduce((n,message)=>n + new TextEncoder().encode(message.content).length,0);\n  if(bytes + CHAT_TEMPLATE_RESERVE + maxTokens > CONTEXT_WINDOW_SIZE) throw new Error('INPUT_TOO_LONG');\n  return bytes;\n}\n\nconst norm = x => x.normalize('NFC').replace(/\\s+/g,' ').trim();\nfunction supported(quote, source){\n  return !!quote && !!norm(quote) && norm(source).includes(norm(quote));\n}\n\n\nconst ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];\nfunction analysisIsBad(text, source){return parseAnalysis(text, source).some(row=>!row.valid || (!row.missingEvidence && !row.verified));}\n\n// src/inference-worker.js\nlet engine = null, active = null;\nconst send = (id,type,value)=>self.postMessage({id,type,value});\nself.onmessage = async ({data:message})=>{\n  if(message.type === 'cancel'){\n    if(active?.id === message.id){\n      active.cancelled = true;\n      engine?.interruptGenerate();\n    }\n    return;\n  }\n  if(active){ self.postMessage({id:message.id,type:'error',error:'BUSY'}); return; }\n  const job = active = {id:message.id, cancelled:false};\n  try{\n    let value;\n    if(message.type === 'load'){\n      // Import errors are returned through the same protocol as model-load failures.\n      const {MLCEngine} = await import(WEBLLM_URL);\n      engine = new MLCEngine();\n      engine.setInitProgressCallback(progress=>send(job.id,'progress',progress));\n      await engine.reload(MODEL_ID);\n    }else if(message.type === 'generate'){\n      if(!engine) throw new Error('MODEL_NOT_READY');\n      checkBudget(message.messages, message.maxTokens);\n      let text = '', cut = false, updated = 0;\n      const stream = await engine.chat.completions.create({\n        messages:message.messages, temperature:TEMPERATURE, max_tokens:message.maxTokens, stream:true,\n        // WebLLM 0.2.80's XGrammar path can abort the WASM runtime (upstream #807).\n        // Keep normal text decoding; enforce XML through prompts and validation.\n        extra_body:{enable_thinking:false}\n      });\n      for await(const chunk of stream){\n        if(job.cancelled) break;\n        text += chunk.choices[0]?.delta?.content || '';\n        if(chunk.choices[0]?.finish_reason === 'length') cut = true;\n        // Limit cross-thread messages and DOM work during streaming.\n        if(performance.now()-updated >= 100){ send(job.id,'progress',text); updated = performance.now(); }\n      }\n      value = {text:text.replace(/<think>[\\s\\S]*?<\\/think>/g,''),cut};\n    }else throw new Error('WORKER_ERROR');\n    if(job.cancelled) throw new Error('CANCELLED');\n    send(job.id,'done',value);\n  }catch(error){\n    const detail = String(error.message || error);\n    const aborted = /\\bAborted\\(|memory access out of bounds|unreachable/i.test(detail);\n    self.postMessage({id:job.id,type:'error',error:job.cancelled ? 'CANCELLED' : aborted ? 'RUNTIME_ABORTED' : detail, ...(aborted ? {detail} : {})});\n  }finally{ active = null; }\n};";
 // src/config.js
 const MODEL_ID = 'Qwen3-4B-q4f16_1-MLC';
 const MODEL_NAME = 'Qwen3-4B';
@@ -163,25 +163,49 @@ const CHAT_TEMPLATE_RESERVE = 256;
 const ANALYSIS_MAX_TOKENS = 1700;
 const GENERATION_MAX_TOKENS = 700;
 
+// Sampling and validation retries (retries after the first attempt; integer >= 0).
+const TEMPERATURE = 0.2;
+const MAX_RETRIES = 1;
+
+// Worker inactivity deadline and grace period after cancelling, in milliseconds.
+const WORKER_TIMEOUT_MS = 300_000;
+const CANCEL_TIMEOUT_MS = 10_000;
+
+// Model requirements: memory is an estimate for display, not an allocation limit.
+const MODEL_GPU_MEMORY_GB = 3.4;
+const REQUIRED_GPU_FEATURES = Object.freeze(['shader-f16']);
+
+// src/gpu.js
+async function checkWebGpuSupport(gpu=navigator.gpu, requiredFeatures=REQUIRED_GPU_FEATURES){
+  if(!gpu) return 'noGpu';
+  try{
+    const adapter = await gpu.requestAdapter();
+    if(!adapter) return 'noAdapter';
+    if(requiredFeatures.some(feature=>!adapter.features.has(feature))) return 'noFeatures';
+  }catch{ return 'noCheck'; }
+  return null;
+}
+
 // src/i18n.js
 const LI = {de:0, fr:1, it:2};
 const LANG_NAME = {de:'Deutsch', fr:'Französisch', it:'Italienisch'};
 const S = MODEL_SIZE_LABEL;
+const FEATURES = REQUIRED_GPU_FEATURES.length ? ' (' + REQUIRED_GPU_FEATURES.join(', ') + ')' : '';
 const MSG = {
   loadBtn: [`Modell laden (${MODEL_NAME}, ${S})`, `Charger le modèle (${MODEL_NAME}, ${S})`, `Carica il modello (${MODEL_NAME}, ${S})`],
-  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt WebGPU mit shader-f16 und ca. 3.4 GB GPU-Speicher; bei Speichermangel kann das Laden trotzdem scheitern.`,
-         `Le modèle doit être téléchargé la première fois (${S}). Nécessite WebGPU avec shader-f16 et environ 3.4 Go de mémoire GPU ; le chargement peut échouer si la mémoire manque.`,
-         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede WebGPU con shader-f16 e circa 3.4 GB di memoria GPU; il caricamento può fallire se la memoria è insufficiente.`],
+  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt WebGPU${FEATURES} und ca. ${MODEL_GPU_MEMORY_GB} GB GPU-Speicher; bei Speichermangel kann das Laden trotzdem scheitern.`,
+         `Le modèle doit être téléchargé la première fois (${S}). Nécessite WebGPU${FEATURES} et environ ${MODEL_GPU_MEMORY_GB} Go de mémoire GPU ; le chargement peut échouer si la mémoire manque.`,
+         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede WebGPU${FEATURES} e circa ${MODEL_GPU_MEMORY_GB} GB di memoria GPU; il caricamento può fallire se la memoria è insufficiente.`],
   loading: [`Lade Modell ${MODEL_NAME} (${S})…`, `Chargement du modèle ${MODEL_NAME} (${S})…`, `Caricamento del modello ${MODEL_NAME} (${S})…`],
   ready: ['Modell geladen. Bereit.', 'Modèle chargé. Prêt.', 'Modello caricato. Pronto.'],
   loadErr: ['Fehler beim Laden: ', 'Erreur de chargement : ', 'Errore di caricamento: '],
   noGpu: ['Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Ce navigateur ne prend pas en charge WebGPU. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Questo browser non supporta WebGPU. Usa Chrome o Edge (desktop) aggiornato.'],
   noAdapter: ['Es wurde kein WebGPU-fähiger Grafikadapter gefunden. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Aucune carte graphique compatible WebGPU trouvée. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Nessuna scheda grafica compatibile con WebGPU trovata. Usa Chrome o Edge (desktop) aggiornato.'],
-  noF16: ['Deine Grafikkarte bzw. dein Browser unterstützt die benötigte WebGPU-Erweiterung «shader-f16» nicht. Bitte aktuelles Chrome oder Edge (Desktop) mit aktuellem Grafiktreiber verwenden.', 'Votre carte graphique ou navigateur ne prend pas en charge l’extension WebGPU «shader-f16». Utilisez Chrome ou Edge récent avec un pilote graphique à jour.', 'La tua scheda grafica o il browser non supporta l’estensione WebGPU «shader-f16». Usa Chrome o Edge aggiornato con driver grafici aggiornati.'],
+  noFeatures: [`Mindestens eine benötigte WebGPU-Erweiterung fehlt. Erforderlich: ${REQUIRED_GPU_FEATURES.join(', ')}. Bitte Browser und Grafiktreiber prüfen.`, `Au moins une extension WebGPU requise manque. Extensions requises : ${REQUIRED_GPU_FEATURES.join(', ')}. Vérifiez le navigateur et le pilote graphique.`, `Manca almeno un’estensione WebGPU richiesta. Estensioni richieste: ${REQUIRED_GPU_FEATURES.join(', ')}. Controlla browser e driver grafici.`],
   noCheck: ['WebGPU konnte nicht geprüft werden.', 'WebGPU n’a pas pu être vérifié.', 'Impossibile verificare WebGPU.'],
   first: ['Bitte zuerst ein Modell laden.', 'Veuillez d’abord charger un modèle.', 'Carica prima un modello.'],
   working: ['Erzeuge Antwort…', 'Génération de la réponse…', 'Generazione della risposta…'],
-  retry: ['Antwort unvollständig – zweiter Versuch…', 'Réponse incomplète – deuxième essai…', 'Risposta incompleta – secondo tentativo…'],
+  retry: ['Antwort unvollständig – erneuter Versuch…', 'Réponse incomplète – nouvel essai…', 'Risposta incompleta – nuovo tentativo…'],
   err: ['Fehler: ', 'Erreur : ', 'Errore: '],
   partial: ['Hinweis: Das Modell hat die Vorgaben nur teilweise eingehalten. Ergebnis mit Vorsicht lesen.', 'Remarque : le modèle n’a respecté les consignes qu’en partie. À lire avec prudence.', 'Nota: il modello ha rispettato le istruzioni solo in parte. Leggere con cautela.'],
   raw: ['Rohantwort des Modells anzeigen', 'Afficher la réponse brute du modèle', 'Mostra la risposta grezza del modello'],
@@ -379,7 +403,7 @@ function createBlobWorker(source){
 // src/inference.js
 // Only this adapter knows the worker protocol. It owns timeouts and stale replies.
 class InferenceClient {
-  constructor({workerFactory, timeoutMs=300_000, cancelTimeoutMs=10_000}={}){
+  constructor({workerFactory, timeoutMs=WORKER_TIMEOUT_MS, cancelTimeoutMs=CANCEL_TIMEOUT_MS}={}){
     this.workerFactory = workerFactory || createInferenceWorker;
     this.timeoutMs = timeoutMs;
     this.cancelTimeoutMs = cancelTimeoutMs;
@@ -529,15 +553,6 @@ tabs.forEach((tab,index)=>{
   });
 });
 
-async function checkWebGpuSupport(){
-  if(!navigator.gpu) return 'noGpu';
-  try{
-    const adapter = await navigator.gpu.requestAdapter();
-    if(!adapter) return 'noAdapter';
-    if(!adapter.features.has('shader-f16')) return 'noF16';
-  }catch(err){ return 'noCheck'; }
-  return null;
-}
 applyLang();
 (async ()=>{
   gpuProblem = await checkWebGpuSupport();
@@ -611,7 +626,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
     document.getElementById('resultStatus').textContent = m('working');
     resultEl.textContent = m('working');
     let response = await ask(userPrompt);
-    if(!cancelled && !response.cut && opts.isBad(response.text)){
+    for(let retry=0; retry<MAX_RETRIES && !cancelled && !response.cut && opts.isBad(response.text); retry++){
       // Use corrective instructions, keeping the original input and evidence checks.
       resultEl.textContent = m('retry');
       response = await ask(userPrompt, opts.retrySystem ? localizedSystem(opts.retrySystem, requestLang) : systemPrompt);

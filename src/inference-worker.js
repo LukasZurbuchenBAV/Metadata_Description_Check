@@ -1,4 +1,4 @@
-import {MODEL_ID, WEBLLM_URL} from './config.js';
+import {MODEL_ID, WEBLLM_URL, TEMPERATURE} from './config.js';
 import {checkBudget} from './validation.js';
 
 let engine = null, active = null;
@@ -26,7 +26,7 @@ self.onmessage = async ({data:message})=>{
       checkBudget(message.messages, message.maxTokens);
       let text = '', cut = false, updated = 0;
       const stream = await engine.chat.completions.create({
-        messages:message.messages, temperature:0.2, max_tokens:message.maxTokens, stream:true,
+        messages:message.messages, temperature:TEMPERATURE, max_tokens:message.maxTokens, stream:true,
         // WebLLM 0.2.80's XGrammar path can abort the WASM runtime (upstream #807).
         // Keep normal text decoding; enforce XML through prompts and validation.
         extra_body:{enable_thinking:false}

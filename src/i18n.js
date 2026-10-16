@@ -1,22 +1,23 @@
-import {MODEL_NAME, MODEL_SIZE_LABEL} from './config.js';
+import {MODEL_NAME, MODEL_SIZE_LABEL, MODEL_GPU_MEMORY_GB, REQUIRED_GPU_FEATURES} from './config.js';
 export const LI = {de:0, fr:1, it:2};
 export const LANG_NAME = {de:'Deutsch', fr:'Französisch', it:'Italienisch'};
 const S = MODEL_SIZE_LABEL;
+const FEATURES = REQUIRED_GPU_FEATURES.length ? ' (' + REQUIRED_GPU_FEATURES.join(', ') + ')' : '';
 const MSG = {
   loadBtn: [`Modell laden (${MODEL_NAME}, ${S})`, `Charger le modèle (${MODEL_NAME}, ${S})`, `Carica il modello (${MODEL_NAME}, ${S})`],
-  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt WebGPU mit shader-f16 und ca. 3.4 GB GPU-Speicher; bei Speichermangel kann das Laden trotzdem scheitern.`,
-         `Le modèle doit être téléchargé la première fois (${S}). Nécessite WebGPU avec shader-f16 et environ 3.4 Go de mémoire GPU ; le chargement peut échouer si la mémoire manque.`,
-         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede WebGPU con shader-f16 e circa 3.4 GB di memoria GPU; il caricamento può fallire se la memoria è insufficiente.`],
+  hint: [`Das Modell muss beim ersten Mal heruntergeladen werden (${S}). Benötigt WebGPU${FEATURES} und ca. ${MODEL_GPU_MEMORY_GB} GB GPU-Speicher; bei Speichermangel kann das Laden trotzdem scheitern.`,
+         `Le modèle doit être téléchargé la première fois (${S}). Nécessite WebGPU${FEATURES} et environ ${MODEL_GPU_MEMORY_GB} Go de mémoire GPU ; le chargement peut échouer si la mémoire manque.`,
+         `Al primo utilizzo il modello deve essere scaricato (${S}). Richiede WebGPU${FEATURES} e circa ${MODEL_GPU_MEMORY_GB} GB di memoria GPU; il caricamento può fallire se la memoria è insufficiente.`],
   loading: [`Lade Modell ${MODEL_NAME} (${S})…`, `Chargement du modèle ${MODEL_NAME} (${S})…`, `Caricamento del modello ${MODEL_NAME} (${S})…`],
   ready: ['Modell geladen. Bereit.', 'Modèle chargé. Prêt.', 'Modello caricato. Pronto.'],
   loadErr: ['Fehler beim Laden: ', 'Erreur de chargement : ', 'Errore di caricamento: '],
   noGpu: ['Dieser Browser unterstützt WebGPU nicht. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Ce navigateur ne prend pas en charge WebGPU. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Questo browser non supporta WebGPU. Usa Chrome o Edge (desktop) aggiornato.'],
   noAdapter: ['Es wurde kein WebGPU-fähiger Grafikadapter gefunden. Bitte aktuelles Chrome oder Edge (Desktop) verwenden.', 'Aucune carte graphique compatible WebGPU trouvée. Veuillez utiliser Chrome ou Edge (ordinateur) récent.', 'Nessuna scheda grafica compatibile con WebGPU trovata. Usa Chrome o Edge (desktop) aggiornato.'],
-  noF16: ['Deine Grafikkarte bzw. dein Browser unterstützt die benötigte WebGPU-Erweiterung «shader-f16» nicht. Bitte aktuelles Chrome oder Edge (Desktop) mit aktuellem Grafiktreiber verwenden.', 'Votre carte graphique ou navigateur ne prend pas en charge l’extension WebGPU «shader-f16». Utilisez Chrome ou Edge récent avec un pilote graphique à jour.', 'La tua scheda grafica o il browser non supporta l’estensione WebGPU «shader-f16». Usa Chrome o Edge aggiornato con driver grafici aggiornati.'],
+  noFeatures: [`Mindestens eine benötigte WebGPU-Erweiterung fehlt. Erforderlich: ${REQUIRED_GPU_FEATURES.join(', ')}. Bitte Browser und Grafiktreiber prüfen.`, `Au moins une extension WebGPU requise manque. Extensions requises : ${REQUIRED_GPU_FEATURES.join(', ')}. Vérifiez le navigateur et le pilote graphique.`, `Manca almeno un’estensione WebGPU richiesta. Estensioni richieste: ${REQUIRED_GPU_FEATURES.join(', ')}. Controlla browser e driver grafici.`],
   noCheck: ['WebGPU konnte nicht geprüft werden.', 'WebGPU n’a pas pu être vérifié.', 'Impossibile verificare WebGPU.'],
   first: ['Bitte zuerst ein Modell laden.', 'Veuillez d’abord charger un modèle.', 'Carica prima un modello.'],
   working: ['Erzeuge Antwort…', 'Génération de la réponse…', 'Generazione della risposta…'],
-  retry: ['Antwort unvollständig – zweiter Versuch…', 'Réponse incomplète – deuxième essai…', 'Risposta incompleta – secondo tentativo…'],
+  retry: ['Antwort unvollständig – erneuter Versuch…', 'Réponse incomplète – nouvel essai…', 'Risposta incompleta – nuovo tentativo…'],
   err: ['Fehler: ', 'Erreur : ', 'Errore: '],
   partial: ['Hinweis: Das Modell hat die Vorgaben nur teilweise eingehalten. Ergebnis mit Vorsicht lesen.', 'Remarque : le modèle n’a respecté les consignes qu’en partie. À lire avec prudence.', 'Nota: il modello ha rispettato le istruzioni solo in parte. Leggere con cautela.'],
   raw: ['Rohantwort des Modells anzeigen', 'Afficher la réponse brute du modèle', 'Mostra la risposta grezza del modello'],

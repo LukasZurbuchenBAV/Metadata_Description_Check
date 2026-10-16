@@ -1,3 +1,4 @@
+import {TEMPERATURE} from '../src/config.js';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
@@ -5,10 +6,10 @@ import assert from 'node:assert/strict';
 import {checkBudget} from '../src/validation.js';
 
 const code=readFileSync(new URL('../src/inference-worker.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'');
-async function generate(mode){
+async function generate(mode, temperature=TEMPERATURE){
   const requests=[],replies=[];
   const self={postMessage:message=>replies.push(message)};
-  const context=vm.createContext({self,performance,checkBudget,fakeEngine:{chat:{completions:{create:async request=>{
+  const context=vm.createContext({self,performance,checkBudget,TEMPERATURE:temperature,fakeEngine:{chat:{completions:{create:async request=>{
     requests.push(request);
     return (async function*(){yield {choices:[{delta:{content:'response'},finish_reason:'stop'}]};})();
   }}}}});
@@ -31,7 +32,7 @@ test('description generation remains unconstrained prose',async()=>{
 test('a native WASM abort is reported as fatal, not as a completed response',async()=>{
   const replies=[];
   const self={postMessage:message=>replies.push(message)};
-  const context=vm.createContext({self,performance,checkBudget,fakeEngine:{chat:{completions:{create:async()=>{
+  const context=vm.createContext({self,performance,checkBudget,TEMPERATURE,fakeEngine:{chat:{completions:{create:async()=>{
     throw new WebAssembly.RuntimeError('Aborted(). Build with -sASSERTIONS for more info.');
   }}}}});
   vm.runInContext(code,context);
@@ -41,4 +42,9 @@ test('a native WASM abort is reported as fatal, not as a completed response',asy
   assert.equal(replies[0].type,'error');
   assert.equal(replies[0].error,'RUNTIME_ABORTED');
   assert.match(replies[0].detail,/Aborted/);
+});
+
+test('sampling uses the configured temperature rather than a fixed value',async()=>{
+  const request=await generate('analysis',0.7);
+  assert.equal(request.temperature,0.7);
 });

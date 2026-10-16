@@ -4,15 +4,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {InferenceClient, generateResponse} from '../src/inference.js';
 
-const source = ['config', 'i18n', 'validation', 'prompts', 'render', 'app'].map(name=>readFileSync(new URL(`../src/${name}.js`, import.meta.url), 'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'')).join('\n');
-function app(){
+const source = ['config', 'gpu', 'i18n', 'validation', 'prompts', 'render', 'app'].map(name=>readFileSync(new URL(`../src/${name}.js`, import.meta.url), 'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'')).join('\n');
+function app(settings={}){
   const elements=new Map();
   const get=id=>{
     if(!elements.has(id)) elements.set(id,{style:{},dataset:{},value:'',disabled:false,hidden:false,textContent:'',innerHTML:'',addEventListener(name,fn){this[name]=fn;},setAttribute(){},append(){}});
     return elements.get(id);
   };
   const context=vm.createContext({InferenceClient,generateResponse,performance,TextEncoder,setTimeout,clearTimeout,navigator:{},NodeFilter:{SHOW_TEXT:4},document:{getElementById:get,documentElement:{},createTreeWalker(){return {nextNode:()=>null};},querySelectorAll:()=>[],createElement:()=>({addEventListener(){},append(){}})}});
-  vm.runInContext(source,context);
+  const configured=Object.entries(settings).reduce((code,[key,value])=>code.replace(new RegExp('const '+key+' = [^;]+;'),()=> 'const '+key+' = '+JSON.stringify(value)+';'),source);
+  vm.runInContext(configured,context);
   return {get,eval:code=>vm.runInContext(code,context)};
 }
 test('serializes requests and disables reload and language selection', async()=>{
@@ -87,4 +88,26 @@ test('fatal inference failures retain inputs and announce failure instead of suc
   assert.equal(a.get('existing').value,'Die Daten werden jährlich aktualisiert.');
   assert.equal(a.get('analyzeBtn').disabled,true);
   assert.equal(a.eval('busy'),false);
+});
+
+for(const retries of [0,2]) test(`configured retry count ${retries} limits invalid-answer attempts`,async()=>{
+  const a=app({MAX_RETRIES:retries});
+  a.eval(`modelReady=true;globalThis.calls=0;engine={ready:true,generate:async()=>{calls++;return {text:'invalid',cut:false};}};
+    globalThis.request=run('test',GENERATE_SYSTEM,text=>text,{isBad:()=>true,maxTokens:700});`);
+  await a.eval('request');
+  assert.equal(a.eval('calls'),1+retries);
+});
+test('truncation stops retries even when additional retries are configured',async()=>{
+  const a=app({MAX_RETRIES:2});
+  a.eval(`modelReady=true;globalThis.calls=0;engine={ready:true,generate:async()=>{calls++;return {text:'partial',cut:true};}};
+    globalThis.request=run('test',GENERATE_SYSTEM,text=>text,{isBad:()=>true,maxTokens:700});`);
+  await a.eval('request');
+  assert.equal(a.eval('calls'),1);
+});
+test('model hints and capability errors use configured memory and feature names',()=>{
+  const a=app({MODEL_GPU_MEMORY_GB:8,REQUIRED_GPU_FEATURES:['timestamp-query']});
+  assert.match(a.eval(`m('hint')`),/8 GB/);
+  assert.match(a.eval(`m('hint')`),/timestamp-query/);
+  assert.doesNotMatch(a.eval(`m('hint')`),/shader-f16|3\.4/);
+  assert.match(a.eval(`m('noFeatures')`),/timestamp-query/);
 });
