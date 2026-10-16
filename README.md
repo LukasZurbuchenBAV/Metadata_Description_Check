@@ -28,7 +28,8 @@ auf Knopfdruck aus dem Internet geladen.
   Modellartefakte können im Browser-Cache wiederverwendet werden. Browser können
   diesen Cache löschen oder verdrängen; ein erneuter Download bleibt möglich.
 
-Auf integrierter Grafik kann eine Antwort mehrere Minuten dauern. Modell-Laden
+Auf integrierter Grafik kann eine Antwort mehrere Minuten dauern. Die folgenden
+Zeitangaben entsprechen den Standardwerten in `src/config.js`. Modell-Laden
 und Generierung lassen sich abbrechen. Generierung wird zunächst im Worker
 unterbrochen; reagiert dieser nach zehn Sekunden nicht, wird er beendet und das
 Modell muss erneut geladen werden. Ohne Fortschritt wird ein Vorgang nach fünf
@@ -97,7 +98,7 @@ Diese Prüfung beweist weder die inhaltliche Relevanz des Zitats noch die Wahrhe
 der zugrunde liegenden Aussage. Auch eine vollständig formatierte Antwort kann
 Angaben übersehen oder erfinden.
 
-Bei ungültiger Analyse erfolgt höchstens ein zweiter Versuch mit korrigierenden
+Mit den Standardwerten erfolgt bei ungültiger Analyse höchstens ein zweiter Versuch mit korrigierenden
 Anweisungen. Kann die Antwort keinem Kriterium zugeordnet werden, erscheinen eine
 klare Fehlermeldung und die aufgeklappte Rohantwort statt sieben leerer Karten.
 Bei ungültiger generierter Beschreibung erfolgt ebenfalls höchstens ein zweiter Versuch. Kürzungen
@@ -173,6 +174,36 @@ und einen optionalen Browser-Runner für reale GPU-Läufe. Automatische Tests si
 kein Nachweis der Modellqualität; diese muss mit realen Läufen und menschlicher
 Prüfung bewertet werden.
 
+## Entwicklereinstellungen
+
+Die Laufzeit-Standardwerte stehen zentral in [src/config.js](src/config.js).
+Neben Modell-ID/-Name, Download-Anzeige, WebLLM-Quelle und Tokenlimits lassen sich
+folgende Werte anpassen:
+
+| Einstellung | Standard | Bedeutung |
+| --- | --- | --- |
+| `TEMPERATURE` | `0.2` | Sampling-Temperatur für Analyse und Generierung |
+| `MAX_RETRIES` | `1` | Zusätzliche Versuche bei ungültigen Antworten; ganze Zahl ab `0`, mit `0` deaktiviert |
+| `WORKER_TIMEOUT_MS` | `300_000` | Inaktivitätsgrenze in Millisekunden; Fortschrittsmeldungen setzen sie zurück |
+| `CANCEL_TIMEOUT_MS` | `10_000` | Wartezeit nach Generierungsabbruch, bevor ein nicht reagierender Worker beendet wird |
+| `MODEL_GPU_MEMORY_GB` | `3.4` | Geschätzter GPU-Speicherbedarf für die Anzeige; keine Speicherreservierung oder harte Zulassungsgrenze |
+| `REQUIRED_GPU_FEATURES` | `['shader-f16']` | Vor dem Laden geprüfte GPU-Funktionen; bei Modellen ohne optionale Funktionen ist `[]` möglich |
+
+Wiederholungen betreffen die Antwortvalidierung, nicht Modell-Laden, Abbruch oder
+native Laufzeitfehler. Abgeschnittene Antworten werden nicht automatisch wiederholt.
+Die optionale Modell-Evaluation bleibt absichtlich bei einem Versuch pro Messung,
+damit ihre Kennzahlen nicht durch Wiederholungen beschönigt werden.
+
+Nach Änderungen **`python3 scripts/build.py` ausführen und `index.html` mit einchecken**.
+Eine bereits erzeugte Einzeldatei liest `src/config.js` nicht zur Laufzeit nach;
+Endanwender brauchen weiterhin keine Installation und keinen Build-Schritt.
+
+Bei einem Modellwechsel die Einstellungen als zusammengehörige Kombination prüfen:
+GPU-Funktionen und Speicherbedarf, Kontext-/Ausgabelimits, Tokenisierung sowie
+modellabhängige Prompts und Inferenzoptionen müssen zum Modell passen. Eine andere
+Modell-ID allein garantiert keine Kompatibilität. Der geplante Einstellungsbereich
+mit geprüften Presets für Endanwender ist als Aufgabe in [PLAN.md](PLAN.md) erfasst.
+
 ## Struktur und Anpassungen
 
 | Datei | Aufgabe |
@@ -181,7 +212,8 @@ Prüfung bewertet werden.
 | `src/index.template.html`, `styles.css` | Gepflegte HTML-Vorlage und Gestaltung |
 | `scripts/build.py` | Abhängigkeitsfreier Generator der Einzeldatei |
 | `src/app.js` | Formulare, Sprache, gemeinsam gesperrte Aktionen und Ergebnisablauf |
-| `src/config.js` | Modell, Laufzeitquelle und Kontext-/Ausgabelimits |
+| `src/config.js` | Modell, GPU-Anforderungen, Sampling, Wiederholungen, Zeit- und Tokenlimits |
+| `src/gpu.js` | Prüfung der konfigurierten GPU-Anforderungen |
 | `src/i18n.js` | Deutsche, französische und italienische Oberflächentexte |
 | `src/prompts.js` | Gemeinsame Prompts für App und Evaluation |
 | `src/validation.js` | Belege, Antwortstruktur, Fliesstext und Eingabebudget |
