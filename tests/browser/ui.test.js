@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
-import {readFile, mkdtemp, rm} from 'node:fs/promises';
+import {readFile, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
+import {pathToFileURL} from 'node:url';
 import {resolve, extname, sep} from 'node:path';
 
 const executable = process.env.CHROME_PATH;
@@ -51,7 +52,7 @@ class CDP {
   }
 }
 
-test('static app loads, supports keyboard tabs and recovers from inference failures', {skip:!executable,timeout:40_000}, async t=>{
+for(const transport of ['http','file']) test(`${transport}: standalone app loads, supports keyboard tabs and recovers from inference failures`, {skip:!executable,timeout:40_000}, async t=>{
   const server=createServer(async (request,response)=>{
     try{
       const pathname=decodeURIComponent(new URL(request.url,'http://localhost').pathname).replace(/^\/preview(?=\/)/,'');
@@ -63,17 +64,22 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
       response.end(body);
     }catch{ response.writeHead(404); response.end(); }
   });
-  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  if(transport === 'http') await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const profile=await mkdtemp(resolve(tmpdir(),'metafairy-browser-'));
+  const standalone=await mkdtemp(resolve(tmpdir(),'MetaFairy standalone '));
+  await writeFile(resolve(standalone,'index.html'),await readFile(resolve(root,'index.html')));
   const chrome=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',...(process.env.CI ? ['--no-sandbox'] : []),`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore'});
   const cdp=new CDP();
   t.after(async()=>{
     cdp.socket?.close();
     chrome.kill();
-    server.closeAllConnections();
-    await new Promise(resolve=>server.close(resolve));
+    if(transport === 'http'){
+      server.closeAllConnections();
+      await new Promise(resolve=>server.close(resolve));
+    }
     await sleep(100);
     await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});
+    await rm(standalone,{recursive:true,force:true});
   });
   let port;
   for(let attempt=0;attempt<100;attempt++){
@@ -94,6 +100,8 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
     Object.defineProperty(navigator,'gpu',{value:{requestAdapter:async()=>({features:new Set(['shader-f16'])})}});
     Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{if(window.__copyFails) throw new Error('denied');window.__copied=text;}}});
     window.Worker=class {
+      constructor(url){window.__workerURL=url;}
+      addEventListener(){}
       postMessage(message){
         window.__requests.push(message);
         if(message.type==='cancel'){clearTimeout(this.timer);this.onmessage({data:{id:message.id,type:'error',error:'CANCELLED'}});return;}
@@ -103,10 +111,11 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
       terminate(){clearTimeout(this.timer);}
     };
   `});
-  const url=`http://127.0.0.1:${server.address().port}/preview/`;
+  const url=transport === 'http' ? `http://127.0.0.1:${server.address().port}/preview/` : pathToFileURL(resolve(standalone,'index.html')).href;
+  const origin=transport === 'http' ? new URL(url).origin : 'file:';
   await cdp.send('Page.navigate',{url});
   await cdp.until(`document.getElementById('loadBtn') && !document.getElementById('loadBtn').disabled`);
-  assert.equal(requests.some(url=>/^https?:/.test(url)&&!url.startsWith(`http://127.0.0.1:${server.address().port}/`)),false,'no external downloads on page load');
+  assert.equal(requests.some(url=>/^https?:/.test(url)&&!url.startsWith(origin)),false,'no external downloads on page load');
   await cdp.evaluate(`document.getElementById('analyzeTab').focus()`);
   await cdp.send('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight'});
   await cdp.send('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight'});
@@ -172,8 +181,8 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
   await cdp.evaluate(`document.getElementById('lang').value='fr';document.getElementById('lang').dispatchEvent(new Event('change'))`);
   assert.equal(await cdp.evaluate(`document.documentElement.lang`),'fr');
   assert.match(await cdp.evaluate(`document.getElementById('generateBtn').textContent`),/Générer/);
-  // Exercise the actual module worker and its imports without downloading a model.
-  assert.equal(await cdp.evaluate(`new Promise((resolve,reject)=>{const w=new __NativeWorker(new URL('./src/inference-worker.js',location.href),{type:'module'});w.onmessage=e=>{w.terminate();resolve(e.data.error)};w.onerror=e=>{w.terminate();reject(new Error(e.message))};w.postMessage({id:1,type:'unknown'});})`),'WORKER_ERROR');
+  // Exercise the actual embedded worker without local module requests or a model download.
+  assert.equal(await cdp.evaluate(`new Promise((resolve,reject)=>{const w=new __NativeWorker(window.__workerURL);w.onmessage=e=>{w.terminate();resolve(e.data.error)};w.onerror=e=>{w.terminate();reject(new Error(e.message))};w.postMessage({id:1,type:'unknown'});})`),'WORKER_ERROR');
   await cdp.send('Emulation.setDeviceMetricsOverride',{width:375,height:812,deviceScaleFactor:1,mobile:true});
   assert.equal(await cdp.evaluate(`document.documentElement.scrollWidth <= window.innerWidth`),true,'mobile layout fits viewport');
   assert.deepEqual(exceptions,[],'no unhandled browser exceptions');

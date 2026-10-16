@@ -40,3 +40,21 @@ The first final response retained one unverified quote; the application continue
 to flag such passages rather than weakening the quote check. These three runs
 check repeated-use compatibility on the tested Apple WebGPU environment, not a
 guarantee for every browser/GPU or evidence of scoring accuracy.
+
+## Standalone file launch — 2026-10-16
+
+The generated `index.html` was copied alone into a temporary directory with spaces
+in its name and opened via `file://` in a fresh Chrome profile. The app needed
+no server or Node.js/npm runtime, and used no sibling JavaScript files or stylesheet.
+
+- The embedded classic Blob worker had a secure context, native WebGPU,
+  working Cache Storage and IndexedDB access.
+- The actual Qwen3-4B model downloaded and reached the ready state.
+- A real analysis completed with seven result cards and seven scores.
+- Input title: `Grundwasser`.
+- Input description: `Der Datensatz enthält Nitratwerte im Kanton Bern. Das Wasseramt misst jährlich zum Gewässerschutz. Die Daten sind bis 2025 vollständig. Keine Aussage über die Trinkwasserqualität möglich.`
+
+The development test harness controlled Chrome externally; it did not serve the
+app or inject a simulated inference response. Separate automated UI tests cover
+both an isolated file launch and an HTTP repository subpath. This records Chrome
+verification; browser-specific WebGPU/model compatibility still applies elsewhere.

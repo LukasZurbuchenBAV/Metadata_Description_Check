@@ -7,12 +7,17 @@ Das inhaltliche Konzept orientiert sich an
 [machinelearningZH/ogd_ai-metafairy](https://github.com/machinelearningZH/ogd_ai-metafairy).
 
 Die Inferenz läuft mit WebLLM im Browser, ohne eigenen Inferenzserver oder API-Key.
-Die App bleibt eine statische Website ohne Build-Schritt.
+Die mitgelieferte **`index.html` ist eine eigenständige Einzeldatei**: per Doppelklick
+im Browser öffnen, dann **Modell laden**. Kein npm, Node.js, Python, lokaler Server
+oder Installationsschritt ist für die Nutzung erforderlich. Anwendung, Gestaltung
+und Worker-Code sind eingebettet; die KI-Bibliothek und das Modell werden weiterhin
+auf Knopfdruck aus dem Internet geladen.
 
 ## Voraussetzungen und Downloads
 
-- HTTPS oder `localhost`; direktes Öffnen über `file://` unterstützt die ES-Module
-  und den Worker nicht zuverlässig.
+- `index.html` direkt als lokale Datei (`file://`) öffnen oder per HTTPS bereitstellen.
+  Für lokale Dateien enthält sie einen klassischen Blob-Worker statt eines
+  vom Dateisystem nachgeladenen Modul-Workers.
 - Ein Browser mit WebGPU und `shader-f16`, beispielsweise Chrome oder Edge auf
   einem geeigneten Desktop-System. Die App prüft diese Fähigkeiten vor dem Laden.
 - Festes Modell: **Qwen3-4B-q4f16_1-MLC**, WebLLM **0.2.80**.
@@ -47,8 +52,8 @@ Garantie für beliebige zukünftige Versionen dieser Abhängigkeiten.
 
 Für eine geprüfte, selbst gehostete JavaScript-Bibliothek kann `WEBLLM_URL` in
 [src/config.js](src/config.js) auf eine absolute URL eines kompatiblen ES-Modul-Bundles
-zeigen, etwa `new URL('../vendor/web-llm.js', import.meta.url).href`. Lizenz- und
-Drittherstellerhinweise müssen mitgeführt werden. Das verlagert zunächst nur die
+zeigen. Für die Einzeldatei eine HTTPS-URL verwenden und sie nach Änderungen neu
+erzeugen. Lizenz- und Drittherstellerhinweise müssen mitgeführt werden. Das verlagert zunächst nur die
 JavaScript-Bibliothek: für vollständig eigene Modell-Downloads muss zusätzlich
 der WebLLM-Modellkatalog samt Modellartefakten und WASM-Bibliothek im Worker
 konfiguriert werden. Ein vollständig offline nutzbares Deployment wird hier
@@ -109,23 +114,37 @@ gekürzt; bei einer Meldung muss die Eingabe verkürzt werden. Die Ausgabe reser
 Few-Shot-Beispiele wurden zugunsten dieser Reserve aus den Laufzeit-Prompts entfernt;
 die Modellqualität sollte bei Promptänderungen mit der Evaluation geprüft werden.
 
-## Lokal starten und veröffentlichen
+## Öffnen und veröffentlichen
 
-```sh
-python3 -m http.server 8000
-```
+`index.html` herunterladen bzw. aus dem Repository kopieren und per Doppelklick
+öffnen. Die Datei kann allein in einem beliebigen Ordner liegen; `src/`,
+`styles.css` und `package.json` werden zur Nutzung nicht benötigt. Internetzugang
+für den ersten Bibliotheks- und Modell-Download sowie ein geeigneter Browser
+bleiben erforderlich. Die Einzeldatei enthält nicht die 2.5 GB Modellgewichte.
 
-Danach `http://localhost:8000` öffnen. Alternativ: `npm run serve`.
-
-Für GitHub Pages das Repository mit `index.html`, `styles.css` und dem vollständigen
-`src/`-Verzeichnis veröffentlichen. Unter **Settings → Pages** den passenden
-Branch und Ordner auswählen. Relative Modul- und Worker-Pfade funktionieren auch
-unter einem Repository-Unterpfad. Bei Veröffentlichung aus `/docs` müssen alle
-Laufzeitdateien gemeinsam dorthin kopiert werden.
+Für GitHub Pages genügt dieselbe `index.html` im gewählten Branch/Ordner. Auch
+andere statische HTTPS-Hosts und die VS-Code-Vorschau können sie unverändert
+anzeigen. Es müssen keine JavaScript-Module oder Stylesheets separat veröffentlicht
+werden. Die App benötigt keinen Inferenzserver.
 
 ## Entwicklung und Prüfungen
 
-Node.js ab Version 22 genügt; für die Tests ist kein `npm install` nötig.
+Nur für die Entwicklung: Die lesbaren Quellen bleiben in `src/`, die Gestaltung
+in `styles.css`. `src/index.template.html` ist die HTML-Vorlage. Die eingecheckte
+`index.html` wird daraus mit Python-Standardbibliothek erzeugt:
+
+```sh
+python3 scripts/build.py
+python3 scripts/build.py --check
+```
+
+Nach Änderungen an Laufzeitquellen, Vorlage oder Gestaltung die Einzeldatei neu
+erzeugen und mit einchecken. Der Generator bettet die Quellen sowie einen
+klassischen Blob-Worker ein; er lädt keine Abhängigkeiten herunter. Endanwender
+führen diesen Schritt nicht aus. Tests und CI prüfen, dass die Datei aktuell ist.
+
+Node.js ab Version 22 genügt für die JavaScript-Tests; `npm install` ist nicht nötig.
+Auch npm selbst ist optional: `node --test tests/*.test.js` führt dieselben Tests aus.
 
 ```sh
 npm test
@@ -143,8 +162,10 @@ CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm r
 ```
 
 Ohne `CHROME_PATH` wird dieser optionale Test übersprungen. Er verwendet ein
-vorübergehendes Profil und simulierte Modellantworten, prüft aber echte DOM-,
-Tastatur-, Modul- und Worker-Integration. Die CI führt beide Tests unter Linux aus;
+vorübergehendes Profil und simulierte Modellantworten. Er prüft die echte DOM-,
+Tastatur- und Blob-Worker-Integration sowohl per HTTP-Unterpfad als auch mit einer
+isolierten Kopie der Einzeldatei über `file://` – ohne lokale Moduldateien oder
+App-Server. Die CI führt beide Tests unter Linux aus;
 dort läuft der isolierte Headless-Chrome-Prozess ohne seine Sandbox.
 
 Die [mehrsprachige Evaluation](eval/README.md) enthält sechs synthetische Fälle
@@ -156,7 +177,9 @@ Prüfung bewertet werden.
 
 | Datei | Aufgabe |
 | --- | --- |
-| `index.html`, `styles.css` | Semantische Oberfläche und Gestaltung |
+| `index.html` | Fertige Einzeldatei für Endanwender und statische Hosts |
+| `src/index.template.html`, `styles.css` | Gepflegte HTML-Vorlage und Gestaltung |
+| `scripts/build.py` | Abhängigkeitsfreier Generator der Einzeldatei |
 | `src/app.js` | Formulare, Sprache, gemeinsam gesperrte Aktionen und Ergebnisablauf |
 | `src/config.js` | Modell, Laufzeitquelle und Kontext-/Ausgabelimits |
 | `src/i18n.js` | Deutsche, französische und italienische Oberflächentexte |
@@ -164,6 +187,7 @@ Prüfung bewertet werden.
 | `src/validation.js` | Belege, Antwortstruktur, Fliesstext und Eingabebudget |
 | `src/render.js` | Sichere Ausgabe und bestätigtes Kopieren |
 | `src/inference.js` | Worker-Protokoll, Abbruch und Fehlerbehandlung |
+| `src/worker-loader.js` | Worker-Erzeugung und Lebenszyklus der Blob-URL |
 | `src/inference-worker.js` | Laden und Streaming-Inferenz ausserhalb des UI-Threads |
 
 Bei einem Modellwechsel Fähigkeiten, GPU-Bedarf, Kontextfenster, Tokenbudget und
