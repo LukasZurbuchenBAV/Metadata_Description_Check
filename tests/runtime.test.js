@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<script type="module">([\s\S]*?)<\/script>/)[1];
+const source = ['config', 'i18n', 'prompts', 'validation', 'render', 'inference', 'app'].map(name=>readFileSync(new URL(`../src/${name}.js`, import.meta.url), 'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'')).join('\n');
 function app(){
   const elements=new Map();
   const get=id=>{
@@ -16,9 +16,9 @@ function app(){
 }
 test('serializes requests and disables reload and language selection', async()=>{
   const a=app();
-  a.eval(`modelReady=true;engine={chat:{completions:{create:()=>new Promise(r=>globalThis.finish=r)}}};globalThis.first=run('test', GENERATE_SYSTEM,generateBtn,renderPlainText,[],{isBad:generationIsBad,maxTokens:700});`);
+  a.eval(`modelReady=true;engine={chat:{completions:{create:()=>new Promise(r=>globalThis.finish=r)}}};globalThis.first=run('test', GENERATE_SYSTEM,renderPlainText,{isBad:generationIsBad,maxTokens:700});`);
   for(const id of ['analyzeBtn','generateBtn','loadBtn','lang']) assert.equal(a.get(id).disabled,true,id);
-  a.eval(`globalThis.second=run('test',GENERATE_SYSTEM,analyzeBtn,renderPlainText,[],{isBad:generationIsBad,maxTokens:700});`);
+  a.eval(`globalThis.second=run('test',GENERATE_SYSTEM,renderPlainText,{isBad:generationIsBad,maxTokens:700});`);
   await a.eval('second');
   a.eval(`finish((async function*(){yield {choices:[{delta:{content:'Der Datensatz enthält Messwerte.'},finish_reason:'stop'}]};})());`);
   await a.eval('first');
@@ -39,7 +39,7 @@ test('rejects empty output, lists and labels without deleting prose',()=>{
 test('preflight reserves space for output and rejects oversize input',()=>{
   const a=app();
   assert.doesNotThrow(()=>a.eval(`checkBudget([{content:ANALYZE_SYSTEM},{content:'Titel: Wasser\\nBeschreibung: Messwerte im Kanton Bern.'}],1700)`));
-  assert.throws(()=>a.eval(`checkBudget([{content:'ä'.repeat(3000)}],1700)`),/4096/);
+  assert.throws(()=>a.eval(`checkBudget([{content:'ä'.repeat(3000)}],1700)`),/INPUT_TOO_LONG/);
 });
 test('manual language choice is preserved when submitting French input',()=>{
   const a=app();
@@ -49,7 +49,7 @@ test('manual language choice is preserved when submitting French input',()=>{
 });
 test('cancellation suppresses output and releases busy state',async()=>{
   const a=app();
-  a.eval(`modelReady=true;engine={interruptGenerate(){},chat:{completions:{create:()=>new Promise(r=>globalThis.finish=r)}}};globalThis.request=run('test',GENERATE_SYSTEM,generateBtn,renderPlainText,[],{isBad:generationIsBad,maxTokens:700});`);
+  a.eval(`modelReady=true;engine={interruptGenerate(){},chat:{completions:{create:()=>new Promise(r=>globalThis.finish=r)}}};globalThis.request=run('test',GENERATE_SYSTEM,renderPlainText,{isBad:generationIsBad,maxTokens:700});`);
   a.get('cancelBtn').click();
   a.eval(`finish((async function*(){yield {choices:[{delta:{content:'Late result'},finish_reason:'stop'}]};})());`);
   await a.eval('request');

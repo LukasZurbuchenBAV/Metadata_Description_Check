@@ -1,0 +1,185 @@
+import {message, LI, LANG_NAME, UI, PH, TITLES, OPEN} from './i18n.js';
+import {ANALYZE_SYSTEM, GENERATE_SYSTEM, GCLOSE} from './prompts.js';
+import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
+import {renderAnalysisXML, renderPlainText, attachCopy, escapeHtml} from './render.js';
+import {loadEngine, generateResponse} from './inference.js';
+const loadBtn = document.getElementById('loadBtn');
+const status = document.getElementById('status');
+const progresswrap = document.getElementById('progresswrap');
+const progressbar = document.getElementById('progressbar');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const generateBtn = document.getElementById('generateBtn');
+const resultEl = document.getElementById('result');
+
+let engine = null, lang = 'de', modelReady = false, loading = false, gpuProblem = null, busy = false, cancelled = false, checking = true;
+
+const m = key => message(key, lang);
+const origText = new WeakMap();
+function applyLang(){
+  const L = LI[lang];
+  document.documentElement.lang = lang;
+  document.title = TITLES[L];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while((n = walker.nextNode())){
+    if(n.parentElement.closest('script,style,option,#loadBtn,#status,#result,#resultStatus')) continue;
+    if(!origText.has(n)) origText.set(n, n.nodeValue);
+    const orig = origText.get(n), core = orig.trim();
+    if(UI[core]) n.nodeValue = orig.replace(core, L === 0 ? core : UI[core][L-1]);
+  }
+  document.querySelectorAll('textarea[id],input[id]').forEach(el=>{
+    if(!PH[el.id]) return;
+    if(el.dataset.ph0 === undefined) el.dataset.ph0 = el.placeholder;
+    el.placeholder = L === 0 ? el.dataset.ph0 : PH[el.id][L-1];
+  });
+  loadBtn.textContent = m('loadBtn');
+  document.getElementById('cancelBtn').textContent = m('cancel');
+  if(!modelReady && !loading) status.textContent = gpuProblem ? m(gpuProblem) : m('hint');
+}
+const langSel = document.getElementById('lang');
+function setLang(l){ lang = l; langSel.value = l; applyLang(); }
+langSel.addEventListener('change', e=> setLang(e.target.value));
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function activateTab(tab){
+  tabs.forEach(item=>{
+    const active = item === tab;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+    item.tabIndex = active ? 0 : -1;
+    const panel = document.getElementById('tab-' + item.dataset.tab);
+    panel.classList.toggle('active', active);
+    panel.hidden = !active;
+  });
+}
+tabs.forEach((tab,index)=>{
+  tab.addEventListener('click', ()=>activateTab(tab));
+  tab.addEventListener('keydown', event=>{
+    const next = {ArrowRight:(index+1)%tabs.length, ArrowLeft:(index+tabs.length-1)%tabs.length, Home:0, End:tabs.length-1}[event.key];
+    if(next === undefined) return;
+    event.preventDefault(); activateTab(tabs[next]); tabs[next].focus();
+  });
+});
+
+async function checkWebGpuSupport(){
+  if(!navigator.gpu) return 'noGpu';
+  try{
+    const adapter = await navigator.gpu.requestAdapter();
+    if(!adapter) return 'noAdapter';
+    if(!adapter.features.has('shader-f16')) return 'noF16';
+  }catch(err){ return 'noCheck'; }
+  return null;
+}
+applyLang();
+(async ()=>{
+  gpuProblem = await checkWebGpuSupport();
+  checking = false;
+  updateControls();
+  applyLang();
+})();
+
+function updateControls(){
+  loadBtn.disabled = checking || busy || loading || !!gpuProblem;
+  analyzeBtn.disabled = generateBtn.disabled = busy || loading || !modelReady;
+  langSel.disabled = busy || loading;
+  document.getElementById('cancelBtn').hidden = !busy;
+  resultEl.setAttribute('aria-busy', String(busy));
+}
+document.getElementById('cancelBtn').addEventListener('click', ()=>{
+  cancelled = true;
+  engine?.interruptGenerate();
+});
+loadBtn.addEventListener('click', async ()=>{
+  if(checking || busy || loading || gpuProblem) return;
+  loading = true; modelReady = false;
+  updateControls();
+  progresswrap.style.display = 'block';
+  progressbar.style.width = '0%';
+  status.textContent = m('loading');
+  try{
+    await engine?.unload();
+    engine = null;
+    engine = await loadEngine(p=>{
+      const percent = Math.max(0, Math.min(100, Math.round((p.progress||0)*100)));
+      progressbar.style.width = percent+'%';
+      progresswrap.setAttribute('aria-valuenow', String(percent));
+      status.textContent = p.text || m('loading');
+    });
+    modelReady = true;
+    status.textContent = m('ready');
+  }catch(err){
+    await engine?.unload().catch(()=>{});
+    engine = null;
+    status.textContent = m('loadErr') + err.message;
+  }finally{
+    loading = false;
+    progresswrap.style.display = 'none';
+    updateControls();
+  }
+});
+
+async function run(userPrompt, systemPrompt, renderFn, opts){
+  if(busy || loading) return;
+  if(!modelReady || !engine){ resultEl.textContent = m('first'); return; }
+  busy = true; cancelled = false;
+  updateControls();
+  const started = performance.now();
+  systemPrompt = systemPrompt.replace('always in German', 'always in ' + LANG_NAME[lang]).replaceAll('Der Datensatz enthält', OPEN[lang]);
+  const ask = async prompt => {
+    const messages = [{role:'system', content:systemPrompt}, {role:'user', content:prompt}];
+    checkBudget(messages, opts.maxTokens);
+    return generateResponse(engine, messages, opts.maxTokens, acc=>{
+      resultEl.innerHTML = `<p class="placeholder">${m('working')}</p><pre class="stream">${escapeHtml(acc)}</pre>`;
+    }, ()=>cancelled);
+  };
+  try{
+    document.getElementById('resultStatus').textContent = m('working');
+    resultEl.textContent = m('working');
+    let response = await ask(userPrompt);
+    if(!cancelled && !response.cut && opts.isBad(response.text)){
+      // Use the same instructions and input; retry only format/validation failures.
+      resultEl.textContent = m('retry');
+      response = await ask(userPrompt);
+    }
+    if(cancelled){ resultEl.textContent = m('cancelled'); return; }
+    const invalid = opts.isBad(response.text);
+    resultEl.innerHTML = `<p class="notice">${m('disc')}</p>` +
+      (response.cut ? `<p class="notice">${m('trunc')}</p>` : '') +
+      (invalid ? `<p class="notice">${m('partial')}</p>` : '') + renderFn(response.text) +
+      `<p class="placeholder">${m('dur')}: ${((performance.now()-started)/1000).toFixed(0)} s</p>`;
+    if(invalid){
+      const details = document.createElement('details');
+      const summary = document.createElement('summary'); summary.textContent = m('raw');
+      const pre = document.createElement('pre'); pre.className = 'stream'; pre.textContent = response.text;
+      details.append(summary, pre); resultEl.append(details);
+    }
+    if(opts.generated && !invalid && !response.cut) attachCopy(resultEl, response.text, lang);
+  }catch(err){ resultEl.textContent = m('err') + (err.message === 'INPUT_TOO_LONG' ? m('budget') : err.message); }
+  finally{
+    busy = false; updateControls();
+    document.getElementById('resultStatus').textContent = cancelled ? m('cancelled') : m('finished');
+  }
+}
+
+analyzeBtn.addEventListener('click', ()=>{
+  const title = document.getElementById('analyzeTitle').value.trim();
+  const existing = document.getElementById('existing').value.trim();
+  if(busy || loading) return;
+  if(!existing){ resultEl.textContent = m('empty'); return; }
+  const prompt = `Titel: ${title||'(kein Titel angegeben)'}\nBeschreibung: ${existing}`;
+  const source = {title, description:existing};
+
+  run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, lang),
+      {isBad:text=>analysisIsBad(text, source), maxTokens:1700});
+});
+
+generateBtn.addEventListener('click', ()=>{
+  const v = id => document.getElementById(id).value.trim();
+  const title = v('title'), purpose = v('purpose'), content = v('content'), source = v('source'),
+        completeness = v('completeness'), interpretation = v('interpretation'), spatial = v('spatial');
+  if(busy || loading) return;
+  if(![purpose,content,source,completeness,interpretation,spatial].some(Boolean)){ resultEl.textContent = m('empty'); return; }
+  const OP = OPEN[lang];
+  const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
+  const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + GCLOSE + ' Schreibe auf ' + LANG_NAME[lang] + '.';
+  run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:700});
+});

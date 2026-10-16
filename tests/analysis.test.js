@@ -1,14 +1,9 @@
-import {readFileSync} from 'node:fs';
-import vm from 'node:vm';
+import {parseAnalysis, supported} from '../src/validation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const code = html.slice(html.indexOf('function parseAnalysis'), html.indexOf('function cleanGenerated'));
-const normalization = html.slice(html.indexOf('const norm ='), html.indexOf('const AXL'));
-const context = vm.createContext({});
-vm.runInContext(`const ANALYSIS_TAGS=['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug']; ${normalization}\n${code}`, context);
-const evaluate = code => vm.runInContext(code, context);
+const context = {source:null, text:null, quote:null, spaced:null};
+const evaluate = code => Function('parseAnalysis','supported',...Object.keys(context), `return (${code})`)(parseAnalysis,supported,...Object.values(context));
 const source = {title:'Nitratwerte', description:'Keine Aussage über die Trinkwasserqualität möglich. Die Daten werden jährlich aktualisiert.'};
 context.source = source;
 function row(tag, evidence, score='2') {
