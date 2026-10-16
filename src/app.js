@@ -156,6 +156,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
       `<p class="placeholder">${m('dur')}: ${((performance.now()-started)/1000).toFixed(0)} s</p>`;
     if(invalid){
       const details = document.createElement('details');
+      details.open = !opts.generated;
       const summary = document.createElement('summary'); summary.textContent = m('raw');
       const pre = document.createElement('pre'); pre.className = 'stream'; pre.textContent = response.text;
       details.append(summary, pre); resultEl.append(details);

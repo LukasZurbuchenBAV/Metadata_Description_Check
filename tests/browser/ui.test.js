@@ -145,6 +145,16 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
   await cdp.until(`!document.getElementById('analyzeBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].querySelector('.score').textContent`),'2/5');
   assert.match(await cdp.evaluate(`document.querySelectorAll('#result .cat')[4].textContent`),/jährlich aktualisiert/,'evidence uses the submitted source snapshot');
+  await cdp.evaluate(`
+    window.__response='<NAME-beleg>Test</NAME-beleg><NAME>Bewertung.</NAME><NAME-tipp>Prüfen.</NAME-tipp><NAME-score>5</NAME-score>';
+    window.__beforeRetry=__requests.filter(request=>request.type==='generate').length;
+    document.getElementById('analyzeBtn').click();
+  `);
+  await cdp.until(`!document.getElementById('analyzeBtn').disabled`);
+  assert.equal(await cdp.evaluate(`__requests.filter(request=>request.type==='generate').length - __beforeRetry`),2);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('#result .cat').length`),0);
+  assert.match(await cdp.evaluate(`document.getElementById('result').textContent`),/keinem Kriterium zugeordnet/);
+  assert.equal(await cdp.evaluate(`document.querySelector('#result details').open`),true,'unparseable analysis immediately exposes raw output');
   await cdp.evaluate(`window.__mode='error';document.getElementById('loadBtn').click()`);
   await cdp.until(`!document.getElementById('loadBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.getElementById('generateBtn').disabled`),true);

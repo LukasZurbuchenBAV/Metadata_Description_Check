@@ -5,7 +5,11 @@ export function escapeHtml(s){
 }
 export function renderAnalysisXML(text, source, lang){
   const m = key => message(key, lang);
-  return parseAnalysis(text, source).map((row,i)=>{
+  const rows = parseAnalysis(text, source);
+  if(rows.every(row=>!row.body && !row.evidence && !row.tip && row.score === null)){
+    return `<p class="notice">${m('analysisFormatErr')}</p>`;
+  }
+  return rows.map((row,i)=>{
     const badge = row.valid ? `<span class="score score-${row.score}">${row.score}/5</span>` : '';
     const warning = !row.valid ? m('unavailable') : (!row.missingEvidence && !row.verified ? m('unverified') : '');
     const found = row.verified ? `<p class="placeholder">${m('src')} «${escapeHtml(row.evidence)}»</p>` : '';

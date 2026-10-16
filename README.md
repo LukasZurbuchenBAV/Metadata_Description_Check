@@ -70,6 +70,10 @@ nicht mitgeliefert.
    generierte Texte erhalten einen Kopierknopf. Scheitert der Zugriff auf die
    Zwischenablage, zeigt der Knopf dies an; der Text bleibt manuell kopierbar.
 
+Die XML-Ausgabe der Analyse wird beim Decodieren auf die tatsächlichen Kriteriums-Tags
+beschränkt. Platzhalter wie `<NAME>` sind kein gültiges Ausgabeformat. Diese
+Strukturvorgabe ersetzt keine inhaltliche Prüfung.
+
 Analyseergebnisse werden auf alle sieben Kriterien sowie Einschätzung, Fundstelle,
 Tipp und eine ganzzahlige Note von 1 bis 5 geprüft. Fehlende oder doppelte Felder
 führen zu einem sichtbaren Hinweis; es werden keine Ersatznoten erfunden. Die
@@ -84,7 +88,10 @@ Diese Prüfung beweist weder die inhaltliche Relevanz des Zitats noch die Wahrhe
 der zugrunde liegenden Aussage. Auch eine vollständig formatierte Antwort kann
 Angaben übersehen oder erfinden.
 
-Bei ungültiger Antwortstruktur erfolgt höchstens ein zweiter Versuch. Kürzungen
+Bei ungültiger Analyse erfolgt höchstens ein zweiter Versuch mit korrigierenden
+Anweisungen. Kann die Antwort keinem Kriterium zugeordnet werden, erscheinen eine
+klare Fehlermeldung und die aufgeklappte Rohantwort statt sieben leerer Karten.
+Bei ungültiger generierter Beschreibung erfolgt ebenfalls höchstens ein zweiter Versuch. Kürzungen
 werden angezeigt und lösen keine erneute identische Generierung aus. Die Dauer
 schliesst einen möglichen zweiten Versuch ein. Streaming-Abschnitte werden nicht
 als Tokenzahlen ausgegeben.
@@ -150,6 +157,7 @@ Prüfung bewertet werden.
 | `src/config.js` | Modell, Laufzeitquelle und Kontext-/Ausgabelimits |
 | `src/i18n.js` | Deutsche, französische und italienische Oberflächentexte |
 | `src/prompts.js` | Gemeinsame Prompts für App und Evaluation |
+| `src/analysis-format.js` | Zulässige XML-Struktur für die Analyse-Decodierung |
 | `src/validation.js` | Belege, Antwortstruktur, Fliesstext und Eingabebudget |
 | `src/render.js` | Sichere Ausgabe und bestätigtes Kopieren |
 | `src/inference.js` | Worker-Protokoll, Abbruch und Fehlerbehandlung |

@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {renderAnalysisXML, renderPlainText} from '../src/render.js';
@@ -17,4 +18,12 @@ test('unavailable criteria have no fabricated scores and unverified evidence is 
   assert.equal((html.match(/class="score score-/g)||[]).length,1);
   assert.ok(html.includes('nicht verifiziert'));
   assert.ok(html.includes('keine Bewertung verfügbar'));
+});
+
+test('unrecognized placeholder responses show a format failure instead of seven empty cards',()=>{
+  const sample=JSON.parse(readFileSync(new URL('./fixtures/analysis-placeholder.json',import.meta.url)));
+  const html=renderAnalysisXML(sample.raw,sample.source,'de');
+  assert.ok(html.includes('keinem Kriterium zugeordnet'));
+  assert.equal(html.includes('class="cat"'),false);
+  assert.equal(html.includes('/5'),false);
 });
