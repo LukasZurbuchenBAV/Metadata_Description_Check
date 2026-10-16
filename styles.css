@@ -48,7 +48,7 @@
   .cat h3{margin:0 0 4px;font-size:1rem;display:flex;align-items:center;gap:8px}
   .score{font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:10px;color:#fff}
   .score-1,.score-2{background:var(--red)}
-  .score-3{background:#c99a2e}
+  .score-3{background:#876311}
   .score-4,.score-5{background:#2e7d4f}
   .cat p, .cat li{margin:2px 0;font-size:0.94rem}
   .placeholder{color:var(--muted);font-style:italic;font-size:0.9rem}

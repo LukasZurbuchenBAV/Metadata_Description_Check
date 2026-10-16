@@ -34,7 +34,8 @@ function applyLang(){
   });
   loadBtn.textContent = m('loadBtn');
   document.getElementById('cancelBtn').textContent = m('cancel');
-  if(!modelReady && !loading) status.textContent = gpuProblem ? m(gpuProblem) : m('hint');
+  if(!loading && modelReady) status.textContent = m('ready');
+  else if(!loading) status.textContent = gpuProblem ? m(gpuProblem) : m('hint');
 }
 const langSel = document.getElementById('lang');
 function setLang(l){ lang = l; langSel.value = l; applyLang(); }
