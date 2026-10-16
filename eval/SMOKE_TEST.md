@@ -22,3 +22,21 @@ This checks decoder compatibility and the reported empty-result failure. It is
 not a full multilingual evaluation or evidence that the model's assessments and
 scores are calibrated. In this run the model still assigned every criterion 5/5;
 those were model outputs, not application-imposed scores.
+
+## Compatibility fix: repeated normal-decoding test — 2026-10-16
+
+After removing XGrammar, three consecutive analyses used the same loaded Qwen3-4B
+model in one temporary Chrome/WebGPU session. The reported input was reused,
+with the app's normal text decoding, strict validation and at most one corrective
+retry per analysis. No native abort occurred.
+
+| Analysis | Complete criteria | Verified quotes | Truncated |
+| --- | --- | --- | --- |
+| 1 | 7/7 | 6/7 | No |
+| 2 | 7/7 | 7/7 | No |
+| 3 | 7/7 | 7/7 | No |
+
+The first final response retained one unverified quote; the application continues
+to flag such passages rather than weakening the quote check. These three runs
+check repeated-use compatibility on the tested Apple WebGPU environment, not a
+guarantee for every browser/GPU or evidence of scoring accuracy.

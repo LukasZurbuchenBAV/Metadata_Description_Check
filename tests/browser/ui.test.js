@@ -98,7 +98,7 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
         window.__requests.push(message);
         if(message.type==='cancel'){clearTimeout(this.timer);this.onmessage({data:{id:message.id,type:'error',error:'CANCELLED'}});return;}
         if(window.__mode==='stall') return;
-        this.timer=setTimeout(()=>this.onmessage({data:{id:message.id,type:window.__mode==='error'?'error':'done',error:'WORKER_ERROR',value:message.type==='generate'?{text:window.__response,cut:window.__cut||false}:undefined}}),100);
+        this.timer=setTimeout(()=>this.onmessage({data:{id:message.id,type:window.__mode==='error'?'error':'done',error:window.__error||'WORKER_ERROR',value:message.type==='generate'?{text:window.__response,cut:window.__cut||false}:undefined}}),100);
       }
       terminate(){clearTimeout(this.timer);}
     };
@@ -155,6 +155,14 @@ test('static app loads, supports keyboard tabs and recovers from inference failu
   assert.equal(await cdp.evaluate(`document.querySelectorAll('#result .cat').length`),0);
   assert.match(await cdp.evaluate(`document.getElementById('result').textContent`),/keinem Kriterium zugeordnet/);
   assert.equal(await cdp.evaluate(`document.querySelector('#result details').open`),true,'unparseable analysis immediately exposes raw output');
+  await cdp.evaluate(`window.__mode='error';window.__error='RUNTIME_ABORTED';document.getElementById('analyzeBtn').click()`);
+  await cdp.until(`!document.getElementById('loadBtn').disabled`);
+  assert.match(await cdp.evaluate(`document.getElementById('result').textContent`),/Laufzeit ist abgestürzt/);
+  assert.match(await cdp.evaluate(`document.getElementById('resultStatus').textContent`),/fehlgeschlagen/);
+  assert.equal(await cdp.evaluate(`document.getElementById('analyzeBtn').disabled`),true);
+  assert.equal(await cdp.evaluate(`document.getElementById('existing').value`),'Ein anderer Text.');
+  await cdp.evaluate(`window.__mode='ok';window.__error='';document.getElementById('loadBtn').click()`);
+  await cdp.until(`!document.getElementById('generateBtn').disabled`);
   await cdp.evaluate(`window.__mode='error';document.getElementById('loadBtn').click()`);
   await cdp.until(`!document.getElementById('loadBtn').disabled`);
   assert.equal(await cdp.evaluate(`document.getElementById('generateBtn').disabled`),true);

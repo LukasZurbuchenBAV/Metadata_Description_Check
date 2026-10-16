@@ -58,7 +58,7 @@ test('cancellation suppresses output and releases busy state',async()=>{
   assert.equal(a.eval('busy'),false);
 });
 
-test('analysis retries with corrective instructions and preserves constrained decoding mode',async()=>{
+test('analysis retries with corrective instructions and preserves analysis mode',async()=>{
   const a=app();
   const sample=JSON.parse(readFileSync(new URL('./fixtures/analysis-placeholder.json',import.meta.url)));
   a.eval(`globalThis.sample=${JSON.stringify(sample)};globalThis.requests=[];modelReady=true;
@@ -71,4 +71,20 @@ test('analysis retries with corrective instructions and preserves constrained de
   assert.notEqual(a.eval('requests[0].messages[0].content'),a.eval('requests[1].messages[0].content'));
   assert.equal(a.eval('requests[0].messages[1].content'),a.eval('requests[1].messages[1].content'));
   assert.match(a.get('result').innerHTML,/Einschätzung/);
+});
+
+test('fatal inference failures retain inputs and announce failure instead of success',async()=>{
+  const a=app();
+  a.get('analyzeTitle').value='Alpenquerender Verkehr';
+  a.get('existing').value='Die Daten werden jährlich aktualisiert.';
+  a.eval(`modelReady=true;engine={ready:true,generate:async()=>{engine.ready=false;throw new Error('RUNTIME_ABORTED')}};
+    globalThis.request=run('test',ANALYZE_SYSTEM,text=>text,{isBad:()=>false,maxTokens:1700,mode:'analysis'});`);
+  await a.eval('request');
+  assert.match(a.get('result').textContent,/Laufzeit ist abgestürzt/);
+  assert.doesNotMatch(a.get('result').textContent,/ASSERTIONS|Aborted\(/);
+  assert.match(a.get('resultStatus').textContent,/fehlgeschlagen/);
+  assert.equal(a.get('analyzeTitle').value,'Alpenquerender Verkehr');
+  assert.equal(a.get('existing').value,'Die Daten werden jährlich aktualisiert.');
+  assert.equal(a.get('analyzeBtn').disabled,true);
+  assert.equal(a.eval('busy'),false);
 });

@@ -80,7 +80,7 @@ applyLang();
 })();
 
 function errorText(error){
-  const key = {INPUT_TOO_LONG:'budget', WORKER_ERROR:'workerErr', WORKER_TIMEOUT:'timeout', MODEL_NOT_READY:'first', CANCELLED:'cancelled'}[error.message];
+  const key = {INPUT_TOO_LONG:'budget', WORKER_ERROR:'workerErr', WORKER_TIMEOUT:'timeout', MODEL_NOT_READY:'first', CANCELLED:'cancelled', RUNTIME_ABORTED:'runtimeAborted'}[error.message];
   return key ? m(key) : error.message;
 }
 function updateControls(){
@@ -131,6 +131,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
   busy = true; cancelled = false;
   updateControls();
   const started = performance.now();
+  let outcome = 'finished';
   systemPrompt = localizedSystem(systemPrompt, requestLang);
   const ask = async (prompt, instructions=systemPrompt) => {
     const messages = [{role:'system', content:instructions}, {role:'user', content:prompt}];
@@ -162,12 +163,15 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
       details.append(summary, pre); resultEl.append(details);
     }
     if(opts.generated && !invalid && !response.cut) attachCopy(resultEl, response.text, requestLang);
-  }catch(err){ resultEl.textContent = cancelled ? m('cancelled') : m('err') + errorText(err); }
+  }catch(err){
+    outcome = 'failed';
+    resultEl.textContent = cancelled ? m('cancelled') : m('err') + errorText(err);
+  }
   finally{
     busy = false;
     if(!engine?.ready){ modelReady = false; status.textContent = m('reload'); }
     updateControls();
-    document.getElementById('resultStatus').textContent = cancelled ? m('cancelled') : m('finished');
+    document.getElementById('resultStatus').textContent = cancelled ? m('cancelled') : m(outcome);
   }
 }
 
