@@ -2,7 +2,7 @@ import {message, LI, LANG_NAME, UI, PH, TITLES, OPEN} from './i18n.js';
 import {ANALYZE_SYSTEM, GENERATE_SYSTEM, GCLOSE} from './prompts.js';
 import {analysisIsBad, generationIsBad, checkBudget} from './validation.js';
 import {renderAnalysisXML, renderPlainText, attachCopy, escapeHtml} from './render.js';
-import {loadEngine, generateResponse} from './inference.js';
+import {InferenceClient, generateResponse} from './inference.js';
 const loadBtn = document.getElementById('loadBtn');
 const status = document.getElementById('status');
 const progresswrap = document.getElementById('progresswrap');
@@ -77,28 +77,32 @@ applyLang();
   applyLang();
 })();
 
+function errorText(error){
+  const key = {INPUT_TOO_LONG:'budget', WORKER_ERROR:'workerErr', WORKER_TIMEOUT:'timeout', MODEL_NOT_READY:'first', CANCELLED:'cancelled'}[error.message];
+  return key ? m(key) : error.message;
+}
 function updateControls(){
   loadBtn.disabled = checking || busy || loading || !!gpuProblem;
   analyzeBtn.disabled = generateBtn.disabled = busy || loading || !modelReady;
   langSel.disabled = busy || loading;
-  document.getElementById('cancelBtn').hidden = !busy;
+  document.getElementById('cancelBtn').hidden = !(busy || loading);
   resultEl.setAttribute('aria-busy', String(busy));
 }
 document.getElementById('cancelBtn').addEventListener('click', ()=>{
   cancelled = true;
-  engine?.interruptGenerate();
+  engine?.cancel();
 });
 loadBtn.addEventListener('click', async ()=>{
   if(checking || busy || loading || gpuProblem) return;
-  loading = true; modelReady = false;
+  loading = true; modelReady = false; cancelled = false;
   updateControls();
   progresswrap.style.display = 'block';
   progressbar.style.width = '0%';
   status.textContent = m('loading');
   try{
-    await engine?.unload();
-    engine = null;
-    engine = await loadEngine(p=>{
+    engine?.unload();
+    engine = new InferenceClient();
+    await engine.load(p=>{
       const percent = Math.max(0, Math.min(100, Math.round((p.progress||0)*100)));
       progressbar.style.width = percent+'%';
       progresswrap.setAttribute('aria-valuenow', String(percent));
@@ -107,9 +111,9 @@ loadBtn.addEventListener('click', async ()=>{
     modelReady = true;
     status.textContent = m('ready');
   }catch(err){
-    await engine?.unload().catch(()=>{});
+    engine?.unload();
     engine = null;
-    status.textContent = m('loadErr') + err.message;
+    status.textContent = cancelled ? m('cancelled') : m('loadErr') + errorText(err);
   }finally{
     loading = false;
     progresswrap.style.display = 'none';
@@ -118,18 +122,20 @@ loadBtn.addEventListener('click', async ()=>{
 });
 
 async function run(userPrompt, systemPrompt, renderFn, opts){
+  const requestLang = lang;
+  const m = key=>message(key, requestLang);
   if(busy || loading) return;
   if(!modelReady || !engine){ resultEl.textContent = m('first'); return; }
   busy = true; cancelled = false;
   updateControls();
   const started = performance.now();
-  systemPrompt = systemPrompt.replace('always in German', 'always in ' + LANG_NAME[lang]).replaceAll('Der Datensatz enthält', OPEN[lang]);
+  systemPrompt = systemPrompt.replace('always in German', 'always in ' + LANG_NAME[requestLang]).replaceAll('Der Datensatz enthält', OPEN[requestLang]);
   const ask = async prompt => {
     const messages = [{role:'system', content:systemPrompt}, {role:'user', content:prompt}];
     checkBudget(messages, opts.maxTokens);
     return generateResponse(engine, messages, opts.maxTokens, acc=>{
       resultEl.innerHTML = `<p class="placeholder">${m('working')}</p><pre class="stream">${escapeHtml(acc)}</pre>`;
-    }, ()=>cancelled);
+    });
   };
   try{
     document.getElementById('resultStatus').textContent = m('working');
@@ -152,10 +158,12 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
       const pre = document.createElement('pre'); pre.className = 'stream'; pre.textContent = response.text;
       details.append(summary, pre); resultEl.append(details);
     }
-    if(opts.generated && !invalid && !response.cut) attachCopy(resultEl, response.text, lang);
-  }catch(err){ resultEl.textContent = m('err') + (err.message === 'INPUT_TOO_LONG' ? m('budget') : err.message); }
+    if(opts.generated && !invalid && !response.cut) attachCopy(resultEl, response.text, requestLang);
+  }catch(err){ resultEl.textContent = cancelled ? m('cancelled') : m('err') + errorText(err); }
   finally{
-    busy = false; updateControls();
+    busy = false;
+    if(!engine?.ready){ modelReady = false; status.textContent = m('reload'); }
+    updateControls();
     document.getElementById('resultStatus').textContent = cancelled ? m('cancelled') : m('finished');
   }
 }
@@ -167,8 +175,9 @@ analyzeBtn.addEventListener('click', ()=>{
   if(!existing){ resultEl.textContent = m('empty'); return; }
   const prompt = `Titel: ${title||'(kein Titel angegeben)'}\nBeschreibung: ${existing}`;
   const source = {title, description:existing};
+  const requestLang = lang;
 
-  run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, lang),
+  run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, requestLang),
       {isBad:text=>analysisIsBad(text, source), maxTokens:1700});
 });
 
@@ -178,7 +187,6 @@ generateBtn.addEventListener('click', ()=>{
         completeness = v('completeness'), interpretation = v('interpretation'), spatial = v('spatial');
   if(busy || loading) return;
   if(![purpose,content,source,completeness,interpretation,spatial].some(Boolean)){ resultEl.textContent = m('empty'); return; }
-  const OP = OPEN[lang];
   const fields = [['Titel',title],['Zweck',purpose],['Inhalt',content],['Erhebung/Quelle',source],['Vollständigkeit und Aktualität',completeness],['Interpretation',interpretation],['Räumlicher Bezug',spatial]];
   const prompt = 'Erstelle den Beschreibungstext für folgenden Datensatz:\n' + fields.filter(f=>f[1]).map(f=>`${f[0]}: ${f[1]}`).join('\n') + GCLOSE + ' Schreibe auf ' + LANG_NAME[lang] + '.';
   run(prompt, GENERATE_SYSTEM, renderPlainText, {isBad:generationIsBad, generated:true, maxTokens:700});
