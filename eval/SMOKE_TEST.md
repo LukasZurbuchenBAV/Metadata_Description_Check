@@ -1,4 +1,10 @@
-# Analysis-format smoke test — 2026-10-16
+# Historical analysis-format smoke test — 2026-10-16
+
+This records the initial grammar-based fix, not the current decoding path. A later
+user report exposed a native WASM abort, consistent with upstream WebLLM #807.
+The application now avoids XGrammar and retains explicit prompts and strict
+post-generation validation. The successful run below did not establish grammar
+compatibility across devices or repeated sessions.
 
 A real WebGPU run checked the reported `Alpenquerender Verkehr` input from
 `tests/fixtures/analysis-placeholder.json` after the analysis-format fix.

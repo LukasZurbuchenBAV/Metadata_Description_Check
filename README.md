@@ -70,9 +70,13 @@ nicht mitgeliefert.
    generierte Texte erhalten einen Kopierknopf. Scheitert der Zugriff auf die
    Zwischenablage, zeigt der Knopf dies an; der Text bleibt manuell kopierbar.
 
-Die XML-Ausgabe der Analyse wird beim Decodieren auf die tatsächlichen Kriteriums-Tags
-beschränkt. Platzhalter wie `<NAME>` sind kein gültiges Ausgabeformat. Diese
-Strukturvorgabe ersetzt keine inhaltliche Prüfung.
+Die Analyse verwendet normale Text-Decodierung mit expliziten XML-Tagnamen im
+Prompt und strikter anschliessender Validierung. Platzhalter wie `<NAME>` sind
+kein gültiges Ausgabeformat. Die XGrammar-Decodierung ist bewusst deaktiviert:
+WebLLM 0.2.80 kann dabei mit einem nativen `Aborted()` abstürzen (siehe
+[Upstream-Fehlerbericht](https://github.com/mlc-ai/web-llm/issues/807)). Bei einem
+nativen Laufzeitfehler wird der betroffene Worker beendet; erst ein erneutes
+Laden erzeugt einen frischen Worker. Die Formulareingaben bleiben erhalten.
 
 Analyseergebnisse werden auf alle sieben Kriterien sowie Einschätzung, Fundstelle,
 Tipp und eine ganzzahlige Note von 1 bis 5 geprüft. Fehlende oder doppelte Felder
@@ -157,7 +161,6 @@ Prüfung bewertet werden.
 | `src/config.js` | Modell, Laufzeitquelle und Kontext-/Ausgabelimits |
 | `src/i18n.js` | Deutsche, französische und italienische Oberflächentexte |
 | `src/prompts.js` | Gemeinsame Prompts für App und Evaluation |
-| `src/analysis-format.js` | Zulässige XML-Struktur für die Analyse-Decodierung |
 | `src/validation.js` | Belege, Antwortstruktur, Fliesstext und Eingabebudget |
 | `src/render.js` | Sichere Ausgabe und bestätigtes Kopieren |
 | `src/inference.js` | Worker-Protokoll, Abbruch und Fehlerbehandlung |

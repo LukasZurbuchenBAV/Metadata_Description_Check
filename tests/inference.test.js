@@ -89,3 +89,13 @@ test('analysis decoding mode survives the client-to-worker boundary',async()=>{
   await request;
   client.unload();
 });
+
+test('a fatal runtime abort discards the worker and requires a fresh model load',async()=>{
+  const {worker,client}=await loaded();
+  const request=client.generate([],1700,undefined,'analysis');
+  worker.onmessage({data:{id:client.pending.id,type:'error',error:'RUNTIME_ABORTED'}});
+  await assert.rejects(request,/RUNTIME_ABORTED/);
+  assert.equal(client.ready,false);
+  assert.equal(worker.terminated,true);
+  await assert.rejects(client.generate([],1700),/MODEL_NOT_READY/);
+});

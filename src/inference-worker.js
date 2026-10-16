@@ -1,4 +1,3 @@
-import {ANALYSIS_GRAMMAR} from './analysis-format.js';
 import {MODEL_ID, WEBLLM_URL} from './config.js';
 import {checkBudget} from './validation.js';
 
@@ -28,7 +27,8 @@ self.onmessage = async ({data:message})=>{
       let text = '', cut = false, updated = 0;
       const stream = await engine.chat.completions.create({
         messages:message.messages, temperature:0.2, max_tokens:message.maxTokens, stream:true,
-        ...(message.mode === 'analysis' ? {response_format:{type:'grammar',grammar:ANALYSIS_GRAMMAR}} : {}),
+        // WebLLM 0.2.80's XGrammar path can abort the WASM runtime (upstream #807).
+        // Keep normal text decoding; enforce XML through prompts and validation.
         extra_body:{enable_thinking:false}
       });
       for await(const chunk of stream){
@@ -43,6 +43,8 @@ self.onmessage = async ({data:message})=>{
     if(job.cancelled) throw new Error('CANCELLED');
     send(job.id,'done',value);
   }catch(error){
-    self.postMessage({id:job.id,type:'error',error:job.cancelled ? 'CANCELLED' : String(error.message || error)});
+    const detail = String(error.message || error);
+    const aborted = /\bAborted\(|memory access out of bounds|unreachable/i.test(detail);
+    self.postMessage({id:job.id,type:'error',error:job.cancelled ? 'CANCELLED' : aborted ? 'RUNTIME_ABORTED' : detail, ...(aborted ? {detail} : {})});
   }finally{ active = null; }
 };
