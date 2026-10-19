@@ -83,16 +83,15 @@ test('cancellation suppresses output and releases busy state',async()=>{
   assert.equal(a.eval('busy'),false);
 });
 
-test('analysis retries with corrective instructions and preserves analysis mode',async()=>{
+test('analysis retries with corrective instructions',async()=>{
   const a=app();
   const sample=JSON.parse(readFileSync(new URL('./fixtures/analysis-placeholder.json',import.meta.url)));
   a.eval(`globalThis.sample=${JSON.stringify(sample)};globalThis.requests=[];modelReady=true;
     const valid=ANALYSIS_TAGS.map(tag=>'<'+tag+'>Einschätzung.</'+tag+'><'+tag+'-beleg>none</'+tag+'-beleg><'+tag+'-tipp>Prüfen.</'+tag+'-tipp><'+tag+'-score>2</'+tag+'-score>').join('');
-    engine={ready:true,generate:async(messages,maxTokens,onProgress,mode)=>{requests.push({messages,mode});return {text:requests.length===1?sample.raw:valid,cut:false};}};
-    globalThis.request=run(analysisPrompt(sample.source),ANALYZE_SYSTEM,text=>renderAnalysisXML(text,sample.source,'de'),{isBad:text=>analysisIsBad(text,sample.source),maxTokens:1700,mode:'analysis',retrySystem:ANALYZE_RETRY_SYSTEM});`);
+    engine={ready:true,generate:async(messages)=>{requests.push({messages});return {text:requests.length===1?sample.raw:valid,cut:false};}};
+    globalThis.request=run(analysisPrompt(sample.source),ANALYZE_SYSTEM,text=>renderAnalysisXML(text,sample.source,'de'),{isBad:text=>analysisIsBad(text,sample.source),maxTokens:1700,retrySystem:ANALYZE_RETRY_SYSTEM});`);
   await a.eval('request');
   assert.equal(a.eval('requests.length'),2);
-  assert.equal(a.eval(`requests.every(request=>request.mode==='analysis')`),true);
   assert.notEqual(a.eval('requests[0].messages[0].content'),a.eval('requests[1].messages[0].content'));
   assert.equal(a.eval('requests[0].messages[1].content'),a.eval('requests[1].messages[1].content'));
   assert.match(a.get('result').innerHTML,/Einschätzung/);
@@ -103,7 +102,7 @@ test('fatal inference failures retain inputs and announce failure instead of suc
   a.get('analyzeTitle').value='Alpenquerender Verkehr';
   a.get('existing').value='Die Daten werden jährlich aktualisiert.';
   a.eval(`modelReady=true;engine={ready:true,generate:async()=>{engine.ready=false;throw new Error('RUNTIME_ABORTED')}};
-    globalThis.request=run('test',ANALYZE_SYSTEM,text=>text,{isBad:()=>false,maxTokens:1700,mode:'analysis'});`);
+    globalThis.request=run('test',ANALYZE_SYSTEM,text=>text,{isBad:()=>false,maxTokens:1700});`);
   await a.eval('request');
   assert.match(a.get('result').textContent,/Laufzeit ist abgestürzt/);
   assert.doesNotMatch(a.get('result').textContent,/ASSERTIONS|Aborted\(/);

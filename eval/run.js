@@ -28,7 +28,7 @@ export async function runEvaluation({repeats=3, ids, onProgress=console.info, si
           const messages=[{role:'system',content:localizedSystem(system,item.lang)},{role:'user',content:prompt}];
           checkBudget(messages,maxTokens);
           const started=performance.now();
-          const output=await engine.generate(messages,maxTokens,undefined,mode === 'analysis' ? 'analysis' : 'text');
+          const output=await engine.generate(messages,maxTokens);
           const result={id:item.id,lang:item.lang,repeat,mode,...output,seconds:(performance.now()-started)/1000};
           if(mode==='analysis'){
             result.criteria=parseAnalysis(output.text,item).map(row=>({

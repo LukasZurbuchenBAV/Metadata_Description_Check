@@ -143,7 +143,7 @@ async function run(userPrompt, systemPrompt, renderFn, opts){
     checkBudget(messages, opts.maxTokens);
     return generateResponse(engine, messages, opts.maxTokens, acc=>{
       resultEl.innerHTML = `<p class="placeholder">${m('working')}</p><pre class="stream">${escapeHtml(acc)}</pre>`;
-    }, opts.mode);
+    });
   };
   try{
     document.getElementById('resultStatus').textContent = m('working');
@@ -192,7 +192,7 @@ analyzeBtn.addEventListener('click', ()=>{
   try{ checkMetadataBudget(analysisFields()); }
   catch(err){ resultEl.textContent = errorText(err); return; }
   run(prompt, ANALYZE_SYSTEM, text=>renderAnalysisXML(text, source, requestLang),
-      {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS, mode:'analysis', retrySystem:ANALYZE_RETRY_SYSTEM});
+      {isBad:text=>analysisIsBad(text, source), maxTokens:ANALYSIS_MAX_TOKENS, retrySystem:ANALYZE_RETRY_SYSTEM});
 });
 
 generateBtn.addEventListener('click', ()=>{

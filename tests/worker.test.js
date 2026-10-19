@@ -21,7 +21,7 @@ test('model loading applies the same context size used by the input budget',asyn
   assert.equal(loaded.options.context_window_size,CONTEXT_WINDOW_SIZE);
   assert.equal(replies.at(-1).type,'done');
 });
-async function generate(mode, temperature=TEMPERATURE){
+async function generate(temperature=TEMPERATURE){
   const requests=[],replies=[];
   const self={postMessage:message=>replies.push(message)};
   const context=vm.createContext({self,performance,checkBudget,TEMPERATURE:temperature,fakeEngine:{chat:{completions:{create:async request=>{
@@ -30,18 +30,14 @@ async function generate(mode, temperature=TEMPERATURE){
   }}}}});
   vm.runInContext(code,context);
   vm.runInContext('engine=fakeEngine;',context);
-  await self.onmessage({data:{id:1,type:'generate',mode,messages:[{role:'user',content:'test'}],maxTokens:1700}});
+  await self.onmessage({data:{id:1,type:'generate',messages:[{role:'user',content:'test'}],maxTokens:1700}});
   assert.equal(replies.at(-1).type,'done');
   return requests[0];
 }
-test('analysis avoids the unsafe XGrammar response_format path',async()=>{
-  const request=await generate('analysis');
+test('generation avoids XGrammar and disables thinking',async()=>{
+  const request=await generate();
   assert.equal(request.response_format,undefined);
   assert.equal(request.extra_body.enable_thinking,false);
-});
-test('description generation remains unconstrained prose',async()=>{
-  const request=await generate('text');
-  assert.equal(request.response_format,undefined);
 });
 
 test('a native WASM abort is reported as fatal, not as a completed response',async()=>{
@@ -52,7 +48,7 @@ test('a native WASM abort is reported as fatal, not as a completed response',asy
   }}}}});
   vm.runInContext(code,context);
   vm.runInContext('engine=fakeEngine;',context);
-  await self.onmessage({data:{id:1,type:'generate',mode:'analysis',messages:[{role:'user',content:'test'}],maxTokens:1700}});
+  await self.onmessage({data:{id:1,type:'generate',messages:[{role:'user',content:'test'}],maxTokens:1700}});
   assert.equal(replies.length,1);
   assert.equal(replies[0].type,'error');
   assert.equal(replies[0].error,'RUNTIME_ABORTED');
@@ -60,7 +56,7 @@ test('a native WASM abort is reported as fatal, not as a completed response',asy
 });
 
 test('sampling uses the configured temperature rather than a fixed value',async()=>{
-  const request=await generate('analysis',0.7);
+  const request=await generate(0.7);
   assert.equal(request.temperature,0.7);
 });
 
@@ -80,7 +76,7 @@ function streamingWorker(chunks){
   vm.runInContext('engine=fakeEngine;',context);
   return {replies,release,send:data=>self.onmessage({data})};
 }
-const generation=id=>({id,type:'generate',mode:'text',messages:[{role:'user',content:'Messwerte'}],maxTokens:700});
+const generation=id=>({id,type:'generate',messages:[{role:'user',content:'Messwerte'}],maxTokens:700});
 
 test('stream chunks form the final answer, hide thinking and propagate truncation',async()=>{
   const worker=streamingWorker(async function*(){
