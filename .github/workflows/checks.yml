@@ -1,0 +1,47 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Use minimum supported Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No dependencies to install or cache. Include eval/ and browser tests,
+      # whose modules are not all executed by the unit suite.
+      - name: Check JavaScript syntax
+        run: git ls-files -z '*.js' | xargs -0 -r -n 1 node --check
+
+      # Includes the standalone build --check; do not regenerate index.html here,
+      # since that would hide a stale checked-in artifact.
+      - name: Run unit tests and verify standalone build
+        run: npm test
+
+      # Use the runner's Chrome and simulated inference, without model downloads.
+      - name: Test HTTP and standalone file launches
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          test -x "$CHROME_PATH" || { echo '::error::Chrome is unavailable; browser coverage is required.'; exit 1; }
+          npm run test:browser

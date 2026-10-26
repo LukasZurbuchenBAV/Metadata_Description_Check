@@ -1,52 +1,53 @@
-[README (5).md](https://github.com/user-attachments/files/33432237/README.5.md)
 # MetaFairy (WebLLM-Edition)
 
-Client-seitiger Nachbau von [machinelearningZH/ogd_ai-metafairy](https://github.com/machinelearningZH/ogd_ai-metafairy):
-hilft, Datensatzbeschreibungen zu analysieren oder zu entwerfen – entlang der sechs Achsen
-Zweck, Inhalt, Erhebung/Quelle, Vollständigkeit, Interpretation, Räumlicher Bezug.
+MetaFairy prüft und entwirft Beschreibungen von Open-Government-Datensätzen – nach
+Titel, Zweck, Inhalt, Erhebung/Quelle, Vollständigkeit, Interpretation und räumlichem Bezug.
+Das Konzept orientiert sich an [ogd_ai-metafairy](https://github.com/machinelearningZH/ogd_ai-metafairy).
 
-**Unterschied zum Original:** keine eigene Server-Komponente, kein API-Key, keine laufenden Kosten.
-Die KI ([WebLLM](https://github.com/mlc-ai/web-llm)) läuft komplett im Browser der Nutzenden über WebGPU;
-es werden keine Daten an einen Dritt-Anbieter geschickt.
-
-## Deployment auf GitHub Pages
-
-1. Diesen Ordner in ein eigenes GitHub-Repo pushen (`index.html` muss im Root oder in `/docs` liegen).
-2. Repo → **Settings → Pages** → Source auf den entsprechenden Branch/Ordner stellen.
-3. Nach ein paar Minuten ist die App unter `https://<username>.github.io/<repo>/` erreichbar.
-
-Kein Build-Schritt nötig – es ist eine einzige statische `index.html`.
+Die KI läuft lokal im Browser über [WebLLM](https://github.com/mlc-ai/web-llm).
+Kein API-Key, kein eigener Server, keine Installation.
 
 ## Nutzung
 
-1. Seite öffnen (aktuelles **Chrome** oder **Edge** auf Desktop). Der Browser bzw. die Grafikkarte muss
-   WebGPU samt Erweiterung `shader-f16` unterstützen – sonst zeigt die Seite eine Fehlermeldung.
-2. Auf **„Modell laden"** klicken. Verwendet wird fest **Qwen3-4B** (`Qwen3-4B-q4f16_1-MLC`).
-   Der erste Download (ca. 2,5 GB, Schätzung) dauert etwas und startet erst auf Knopfdruck – danach bleibt das Modell
-   im Browser-Cache.
-3. Oben im Kopf kann die Sprache gewählt werden (**Deutsch, Französisch, Italienisch**). Sie steuert die
-   Oberfläche und die Sprache der Antwort. Die Beschreibung sollte in derselben Sprache vorliegen.
-4. Tab **„Beschreibung analysieren"**: Titel und bestehenden Text einfügen. Ergebnis: pro Achse eine
-   kurze Einschätzung, die **Fundstelle** im Text (wörtliches Zitat, wird per Code gegen den Text geprüft),
-   ein Verbesserungsvorschlag und eine Bewertung (1–5). Die Antwort erscheint live (Streaming).
-   Tab **„Beschreibung generieren"**: Stichworte zu den sechs Achsen eintragen und generieren lassen – das
-   Ergebnis ist ein einziger, zusammenhängender Fliesstext (kein Feld pro Achse), passend zum
-   Beschreibungsfeld in i14y/DCAT-AP-CH.
+1. **`index.html` per Doppelklick öffnen.** Diese Datei genügt; npm und ein lokaler
+   Server sind nicht nötig.
+2. **Sprache wählen:** Deutsch, Französisch oder Italienisch für Oberfläche und Antwort.
+3. **Modell laden:** Qwen3-4B, ca. **2.5 GB Download** beim ersten Laden. Dateien können
+   danach aus dem Browser-Cache geladen werden; ein erneuter Download ist möglich.
+4. **Beschreibung analysieren:** Titel und bestehenden Text einfügen. Pro Kriterium
+   erscheinen Einschätzung, Fundstelle, Verbesserungsvorschlag und Bewertung von 1 bis 5.
+5. **Beschreibung generieren:** mindestens ein inhaltliches Feld ausfüllen. Das Ergebnis
+   ist ein zusammenhängender Fliesstext, der kopiert werden kann.
 
-## Anpassen
+Benötigt einen Browser mit **WebGPU und `shader-f16`**, z. B. Chrome oder Edge auf
+Desktop, sowie ungefähr **4.1 GB GPU-Speicher**. Auf integrierter Grafik kann eine
+Antwort mehrere Minuten dauern. Vorgänge lassen sich abbrechen; nach einem
+Laufzeitfehler das Modell erneut laden. Eingaben bleiben dabei erhalten.
 
-- Modell: Es gibt keine Auswahl im UI. Das Modell (inkl. `enable_thinking: false`) steht als Konstante `MODEL_ID` (plus Grössenangabe
-  `MODEL_SIZE_LABEL`) am Anfang des Script-Blocks in `index.html` und kann dort geändert werden. Die
-  Button-Beschriftung und Hinweistext werden aus diesen Konstanten erzeugt.
-- Sprachen: Texte stehen in `MSG`, `UI`, `PH` (Oberfläche) sowie `ANALYZE_EX`, `GEN_EX`, `OPEN` (Prompt-Beispiele).
-- Geschwindigkeit: Auf integrierter Grafik (z. B. Intel Iris Xe) dauert eine Analyse mehrere Minuten.
-  Temperatur 0.2, Längenlimit und Streaming sind in `run()` gesetzt; ein zweiter Durchlauf erfolgt nur bei
-  unvollständiger Antwort.
-- Prompt/Struktur: `ANALYZE_SYSTEM` (Analyse, strukturiert je Achse) und `GENERATE_SYSTEM` (Generierung, ein
-  Fliesstext) in `index.html` anpassen, z. B. auf eure i14y-/BAV-spezifischen Metadatenfelder statt der
-  sechs Achsen Zweck, Inhalt, Erhebung/Quelle, Vollständigkeit, Interpretation, Räumlicher Bezug.
+Pro Anfrage sind **4500 UTF-8-Bytes** für Titel und Textfelder zusammen möglich
+(bei üblichen deutschen, französischen und italienischen Texten etwa 3500–4500 Zeichen).
+Ein Zähler zeigt den aktuellen Umfang; zu lange Eingaben werden ohne Kürzung abgewiesen.
+
+**Ergebnisse selbst prüfen:** Die KI kann Angaben übersehen oder erfinden.
+Ein geprüftes Zitat bestätigt weder die Qualität der Bewertung noch die Wahrheit der Aussage.
+
+Eingegebene Metadaten werden lokal verarbeitet. Für Bibliothek und Modell werden
+externe Dienste kontaktiert; Internetzugang bleibt dafür erforderlich.
+
+## GitHub Pages
+
+1. `index.html` ins Repository legen.
+2. Unter **Settings → Pages** den Branch und Ordner mit dieser Datei auswählen.
+3. Die veröffentlichte URL öffnen. Weitere Laufzeitdateien oder ein Build auf dem Host sind nicht nötig.
+
+## Anpassen und beitragen
+
+Entwicklerwerte wie Modell, Temperatur und Limits stehen in [src/config.js](src/config.js).
+Nach Änderungen muss die Einzeldatei neu erzeugt werden:
+[Entwicklung und Konfiguration](docs/development.md).
+Weitere Hinweise: [Laufzeit und Grenzen](docs/runtime.md), [geplante Aufgaben](PLAN.md).
 
 ## Lizenz
 
-MIT – siehe Original-Repo. Kein Bezug zu, keine Übernahme von Code aus dem Original; nur das
-inhaltliche Konzept (Analyse entlang mehrerer Achsen) wurde nachgebildet.
+MIT – siehe [LICENSE](LICENSE). Vom Originalprojekt wurde das Konzept übernommen,
+kein Code. Bibliothek und Modellartefakte haben eigene Lizenzen.
