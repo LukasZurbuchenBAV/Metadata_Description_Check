@@ -60,3 +60,24 @@ test('a complete analysis is accepted; every criterion and field is independentl
     }
   }
 });
+test('accepts a field closed with the wrong known closing tag', ()=>{
+  // Beobachtet mit Qwen3-4B: <inhalt-beleg>…</zweck-beleg>
+  const text=complete.replace('<inhalt-beleg>jährlich aktualisiert</inhalt-beleg>','<inhalt-beleg>jährlich aktualisiert</zweck-beleg>');
+  assert.notEqual(text,complete);
+  const inhalt=parseAnalysis(text, source)[2];
+  assert.equal(inhalt.valid,true);
+  assert.equal(inhalt.evidence,'jährlich aktualisiert');
+  assert.equal(analysisIsBad(text,source),false);
+});
+test('tolerates a changed first or last word in quotes of four or more words', ()=>{
+  const description='Diese Datenablage ist als internes Arbeitsmittel zu verstehen.';
+  assert.equal(supported('Die Datenablage ist als internes Arbeitsmittel zu verstehen.', description),true);
+  assert.equal(supported('Diese Datenablage ist als internes Arbeitsmittel zu sehen.', description),true);
+  assert.equal(supported('Die Ablage ist als internes Arbeitsmittel zu verstehen.', description),false);
+  assert.equal(supported('Die Datenablage ist', 'Diese Datenablage ist'),false);
+});
+test('unverified quotes are labelled but do not trigger a retry', ()=>{
+  const text=complete.replace('<zweck-beleg>jährlich aktualisiert</zweck-beleg>','<zweck-beleg>Erfundenes Zitat ohne Quelle</zweck-beleg>');
+  assert.equal(parseAnalysis(text, source)[1].verified,false);
+  assert.equal(analysisIsBad(text,source),false);
+});

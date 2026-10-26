@@ -19,12 +19,24 @@ konfiguriert und deren Lizenzen beachtet werden.
 - Zitate müssen zusammenhängend im Titel bzw. in der Beschreibung vorkommen.
   XML-Zeichenreferenzen wie `&amp;`, `&lt;` und numerische Referenzen werden vor
   dem Vergleich einmal decodiert; bei der Anzeige wird sämtlicher Text sicher maskiert.
-  Nur Unicode-Normalisierung und Leerraum werden vereinheitlicht. Das prüft weder
+  Unicode-Normalisierung und Leerraum werden vereinheitlicht. Bei Zitaten ab vier
+  Wörtern darf zusätzlich das erste oder letzte Wort abweichen (z. B. «Die» statt
+  «Diese»), weil das Modell Satzanfänge gelegentlich leicht abändert. Das prüft weder
   die Relevanz des Zitats noch die Wahrheit der Aussage.
+- Ein Feld darf mit einem falschen, aber bekannten Schluss-Tag enden
+  (beobachtet: `<inhalt-beleg>…</zweck-beleg>`). Unbekannte Tags, fehlende oder
+  doppelte Felder bleiben ungültig.
 - Modellnoten bleiben unverändert. Fehlende Felder erhalten keine Ersatznoten;
   ungültige oder abgeschnittene Antworten werden markiert.
-- Wiederholungen gelten nur für ungültige Antworten, nicht für Kürzungen oder
-  Laufzeitfehler. Die angezeigte Dauer schliesst Wiederholungen ein.
+- Wiederholungen gelten nur für Antworten mit ungültigem Format (fehlende, doppelte
+  oder unlesbare Felder), nicht für nicht verifizierte Zitate, Kürzungen oder
+  Laufzeitfehler. Nicht verifizierte Zitate werden in der Oberfläche markiert; ein
+  zweiter Durchlauf kostet auf integrierter Grafik mehrere Minuten und ändert daran
+  selten etwas. Die angezeigte Dauer schliesst Wiederholungen ein.
+- Bewertet wird die Beschreibung, nicht die Daten: Eine klar benannte Lücke oder
+  fehlende Nachführung kann bei Vollständigkeit gut abschneiden. Die Einschätzung darf
+  Stärken nennen; der Verbesserungsvorschlag enthält nur konkrete Ergänzungen und
+  bei voller Punktzahl «–», das nicht angezeigt wird.
 - Das Eingabebudget nutzt UTF-8-Bytes als konservative Token-Obergrenze mit Antwortreserve.
   Das Modell wird ausdrücklich mit 8192 Kontext-Tokens geladen. Titel und Textfelder
   dürfen zusammen 4500 UTF-8-Bytes enthalten; die Oberfläche zählt den getrimmten Text
