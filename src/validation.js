@@ -24,7 +24,7 @@ export function parseAnalysis(text, source){
   return ANALYSIS_TAGS.map(tag=>{
     const fields = ['', '-beleg', '-tipp', '-score'].map(suffix=>{
       const name = tag + suffix;
-      const matches = [...text.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'gi'))];
+      const matches = [...text.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${ANY_TAG}>`, 'gi'))];
       return matches.length === 1 ? decodeXmlText(matches[0][1]).trim() : '';
     });
     const [body, evidence, tip, scoreText] = fields;
@@ -55,9 +55,19 @@ export function checkBudget(messages, maxTokens){
 
 const norm = x => x.normalize('NFC').replace(/\s+/g,' ').trim();
 export function supported(quote, source){
-  return !!quote && !!norm(quote) && norm(source).includes(norm(quote));
+  const q = norm(quote ?? ''), s = norm(source ?? '');
+  if(!q) return false;
+  if(s.includes(q)) return true;
+  const words = q.split(' ');
+  if(words.length < 4) return false;
+  // Toleriert ein abgeändertes erstes oder letztes Wort (z. B. «Diese» → «Die»).
+  return s.includes(words.slice(1).join(' ')) || s.includes(words.slice(0,-1).join(' '));
 }
 
 
 export const ANALYSIS_TAGS = ['titel','zweck','inhalt','erhebung','vollstaendigkeit','interpretation','raeumlicherbezug'];
-export function analysisIsBad(text, source){return parseAnalysis(text, source).some(row=>!row.valid || (!row.missingEvidence && !row.verified));}
+// Akzeptiert jeden bekannten Schluss-Tag, auch wenn das Modell den falschen erwischt.
+const ANY_TAG = `(?:${ANALYSIS_TAGS.join('|')})(?:-beleg|-tipp|-score)?`;
+// Wiederholung nur bei ungültigem Format. Nicht verifizierte Zitate werden in der
+// Oberfläche markiert und rechtfertigen keinen zweiten, mehrminütigen Durchlauf.
+export function analysisIsBad(text, source){return parseAnalysis(text, source).some(row=>!row.valid);}
