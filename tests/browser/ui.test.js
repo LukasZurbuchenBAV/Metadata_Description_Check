@@ -52,7 +52,7 @@ class CDP {
   }
 }
 
-for(const transport of ['http','file']) test(`${transport}: standalone app loads, supports keyboard tabs and recovers from inference failures`, {skip:!executable,timeout:40_000}, async t=>{
+for(const transport of ['http','file']) test(`${transport}: standalone app loads, supports keyboard tabs and recovers from inference failures`, {skip:!executable,timeout:60_000}, async t=>{
   const server=createServer(async (request,response)=>{
     try{
       const pathname=decodeURIComponent(new URL(request.url,'http://localhost').pathname).replace(/^\/preview(?=\/)/,'');
@@ -82,7 +82,8 @@ for(const transport of ['http','file']) test(`${transport}: standalone app loads
     await rm(standalone,{recursive:true,force:true});
   });
   let port;
-  for(let attempt=0;attempt<100;attempt++){
+  // Ein kalter Chrome-Start auf CI-Runnern dauert gelegentlich über 5 s; bis zu 20 s warten.
+  for(let attempt=0;attempt<400;attempt++){
     try{port=Number((await readFile(resolve(profile,'DevToolsActivePort'),'utf8')).split('\n')[0]);break;}catch{await sleep(50);}
   }
   assert.ok(port,'Chrome debugging endpoint started');
