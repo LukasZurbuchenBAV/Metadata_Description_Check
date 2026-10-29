@@ -50,10 +50,10 @@ const MSG = {
 export const message = (key, lang) => MSG[key][LI[lang]];
 
 export const UI = {
-  'Beschreibungen für Open-Government-Datensätze prüfen und entwerfen – die Eingaben werden lokal im Browser verarbeitet. Für Software und Modell-Downloads werden externe Dienste kontaktiert.': ['Vérifier et rédiger des descriptions OGD – les saisies sont traitées localement dans le navigateur. Des services externes sont contactés pour télécharger le logiciel et le modèle.', 'Verificare e redigere descrizioni OGD – i dati inseriti sono elaborati localmente nel browser. Servizi esterni vengono contattati per scaricare software e modello.'],
+  'Beschreibungen für BAV-Datenbestände prüfen und entwerfen – die Eingaben werden lokal im Browser verarbeitet. Für Software und Modell-Downloads werden externe Dienste kontaktiert.': ['Vérifier et rédiger des descriptions de jeux de données de l’OFT – les saisies sont traitées localement dans le navigateur. Des services externes sont contactés pour télécharger le logiciel et le modèle.', 'Verificare e redigere descrizioni di set di dati dell’UFT – i dati inseriti sono elaborati localmente nel browser. Servizi esterni vengono contattati per scaricare software e modello.'],
   'Beschreibung analysieren': ['Analyser la description', 'Analizza la descrizione'],
   'Beschreibung generieren': ['Générer la description', 'Genera la descrizione'],
-  'Titel des Datensatzes': ['Titre du jeu de données', 'Titolo del set di dati'],
+  'Titel des Datenbestandes': ['Titre du jeu de données', 'Titolo del set di dati'],
   'Bestehende Beschreibung': ['Description existante', 'Descrizione esistente'],
   'Zweck': ['But', 'Scopo'], 'Inhalt': ['Contenu', 'Contenuto'],
   'Erhebung / Quelle': ['Collecte / Source', 'Rilevazione / Fonte'],

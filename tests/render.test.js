@@ -38,3 +38,23 @@ test('encoded XML text renders as readable evidence while encoded markup stays i
   assert.equal(html.includes('<img'),false);
   assert.ok(html.includes('&lt;img'));
 });
+
+test('quotes reused for several criteria and bodies that only repeat text are hidden',()=>{
+  const source={title:'Empfängerliste',description:'Es handelt sich um eine Liste von Ämtern. Die Liste wird zwei mal pro Jahr aktualisiert.'};
+  const rows={
+    titel:['Klarer Titel.','Empfängerliste'],
+    zweck:['Die Liste dient Stellungnahmen.','Es handelt sich um eine Liste von Ämtern.'],
+    inhalt:['Ämter.','none'],
+    erhebung:['Die Liste wird zwei mal pro Jahr aktualisiert.','Die Liste wird zwei mal pro Jahr aktualisiert.'],
+    vollstaendigkeit:['Halbjährliche Nachführung.','Die Liste wird zwei mal pro Jahr aktualisiert'],
+    interpretation:['Die Liste dient Stellungnahmen.','none'],
+    raeumlicherbezug:['Schweiz.','Die Liste wird zwei mal pro Jahr aktualisiert.'],
+  };
+  const xml=Object.entries(rows).map(([t,[body,beleg]])=>`<${t}>${body}</${t}><${t}-beleg>${beleg}</${t}-beleg><${t}-tipp>Ergänzen.</${t}-tipp><${t}-score>3</${t}-score>`).join('');
+  const html=renderAnalysisXML(xml,source,'de');
+  assert.equal(html.includes('zwei mal pro Jahr'),false,'reused quote and quote-only body hidden');
+  assert.ok(html.includes('Fundstelle: «Es handelt sich um eine Liste von Ämtern.»'),'unique quote stays');
+  assert.equal((html.match(/Die Liste dient Stellungnahmen/g)||[]).length,1,'repeated body shown once');
+  assert.ok(html.includes('Halbjährliche Nachführung.'));
+  assert.equal((html.match(/3\/5/g)||[]).length,7,'scores unchanged');
+});

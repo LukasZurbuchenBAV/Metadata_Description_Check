@@ -26,6 +26,10 @@ konfiguriert und deren Lizenzen beachtet werden.
 - Ein Feld darf mit einem falschen, aber bekannten Schluss-Tag enden
   (beobachtet: `<inhalt-beleg>…</zweck-beleg>`). Unbekannte Tags, fehlende oder
   doppelte Felder bleiben ungültig.
+- Anzeige: Ein Zitat, das das Modell für mehrere Kriterien verwendet, wird bei keinem
+  davon als Fundstelle gezeigt, weil es keines zuverlässig belegt. Eine Einschätzung,
+  die nur das Zitat oder eine frühere Einschätzung wiederholt, wird weggelassen.
+  Noten und Verbesserungsvorschläge bleiben sichtbar.
 - Modellnoten bleiben unverändert. Fehlende Felder erhalten keine Ersatznoten;
   ungültige oder abgeschnittene Antworten werden markiert.
 - Wiederholungen gelten nur für Antworten mit ungültigem Format (fehlende, doppelte
